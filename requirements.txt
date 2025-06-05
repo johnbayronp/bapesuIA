@@ -1,3 +1,6 @@
 flask
 flask_cors
 python-dotenv
+rembg # para remover fondo de imagenes
+pillow # para procesar imagenes
+onnxruntime # para ejecutar el modelo de IA
