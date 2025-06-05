@@ -7,6 +7,12 @@ import io
 from app.config import Config
 from .middleware.auth import token_required
 
+@app.route('/')
+def hello2():
+    try:
+        return jsonify(message="Hello, Front! I'm Flask")
+    except Exception as e:
+        abort(500, description=str(e))
 @app.route('/api')
 def hello():
     try:
