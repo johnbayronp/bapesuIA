@@ -9,8 +9,11 @@ import RemoveBackground from './components/tools/RemoveBackground';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ThemeToggle from './components/themeUI/ThemeToggle';
 import { ThemeProvider } from './context/ThemeContext';
+import { useAuthRefresh } from "./hooks/useAuthRefresh";
 
 function App() {
+  useAuthRefresh();
+  
   return (
     <ThemeProvider>
       <Router>
