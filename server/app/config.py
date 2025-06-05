@@ -15,7 +15,13 @@ class Config:
     SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
     
     # Configuración de CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5000').split(',')
+    CORS_ORIGINS = [
+        'http://localhost:3000',  # Desarrollo local
+        'http://localhost:5000',  # Desarrollo local alternativo
+        'https://bapesu-oatictqrm-bayronperezsoutlookes-projects.vercel.app',  # Frontend en Vercel
+        'https://bapesu.vercel.app',  # Frontend en Vercel (dominio personalizado)
+        'https://bapesuia-production.up.railway.app'  # API en Railway
+    ]
     
     # Configuración de API
     API_PREFIX = '/api'
@@ -27,8 +33,8 @@ class Config:
     REMOVE_BG_API_KEY = os.getenv('REMOVE_BG_API_KEY')
 
     # Flask Configuration
-    HOST = os.getenv('FLASK_HOST', 'localhost')
-    PORT = int(os.getenv('FLASK_PORT', '5000'))
+    HOST = os.getenv('FLASK_HOST', '0.0.0.0')  # Para Docker
+    PORT = int(os.getenv('PORT', '5000'))
 
     # Configuración de DeepSeek
     DEEPSEEK_TEMPERATURE = float(os.getenv('DEEPSEEK_TEMPERATURE', '0.7'))

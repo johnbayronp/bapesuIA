@@ -9,10 +9,17 @@ def create_app(config_class=Config):
 
     # Configurar CORS
     CORS(app, 
-         resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}},
+         resources={r"/*": {  # Permitir todas las rutas
+             "origins": config_class.CORS_ORIGINS,
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization", "Accept"],
+             "expose_headers": ["Content-Type", "Authorization"],
+             "supports_credentials": True,
+             "max_age": 600,
+             "send_wildcard": False
+         }},
          supports_credentials=True,
-         allow_headers=["Content-Type", "Authorization"],
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+         automatic_options=True)
 
     # Registrar blueprints
     app.register_blueprint(api_bp, url_prefix=app.config['API_PREFIX'])
