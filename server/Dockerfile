@@ -1,32 +1,34 @@
-# Imagen base de Python
+# Usamos Python 3.9 slim para compatibilidad con tus paquetes
 FROM python:3.9-slim
 
-# Directorio de trabajo
+# Directorio de trabajo en el contenedor
 WORKDIR /app
 
-# Instalar dependencias del sistema
+# Instalamos dependencias del sistema necesarias para compilar extensiones de Pillow y rembg
 RUN apt-get update && apt-get install -y \
     build-essential \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    libjpeg-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements.txt
+# Copiamos el archivo de dependencias
 COPY requirements.txt .
 
-# Instalar dependencias de Python
+# Instalamos las dependencias de Python sin cache para ahorrar espacio
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código del servidor
+# Copiamos el resto de la aplicación
 COPY . .
 
-# Exponer puerto
+# Exponemos el puerto que usa Flask
 EXPOSE 5000
 
-# Variables de entorno
+# Variables de entorno para Flask
 ENV FLASK_APP=run.py
 ENV FLASK_ENV=production
 ENV PORT=5000
 
-# Comando para ejecutar la aplicación
-CMD ["python", "run.py"] 
+# Comando para ejecutar la app
+CMD ["python", "run.py"]
