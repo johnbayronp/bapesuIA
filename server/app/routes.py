@@ -1,10 +1,11 @@
 from app.app import app
-from flask import jsonify, abort, request, send_file
+from flask import jsonify, abort, request, send_file, Blueprint
 import requests
 from rembg import remove
 from PIL import Image
 import io
 from app.config import Config
+from .middleware.auth import token_required
 
 @app.route('/api')
 def hello():
@@ -14,6 +15,7 @@ def hello():
         abort(500, description=str(e))
 
 @app.route('/remove-background', methods=['POST'])
+@token_required
 def remove_background():
     if 'image' not in request.files:
         return 'No image uploaded', 400
@@ -36,6 +38,7 @@ def remove_background():
     return send_file(img_io, mimetype='image/png')
 
 @app.route('/generate-description', methods=['POST'])
+@token_required
 def generate_description():
     try:
         data = request.json
@@ -102,3 +105,24 @@ def generate_description():
             'error': 'Error al procesar la solicitud',
             'details': str(e)
         }), 500
+
+api_bp = Blueprint('api', __name__)
+
+@api_bp.route('/test', methods=['GET'])
+def test_auth():
+    return jsonify({
+        'message': 'Autenticación exitosa',
+        'user': request.user
+    })
+
+@api_bp.route('/user/profile', methods=['GET'])
+@token_required
+def get_user_profile():
+    user_id = request.user.get('sub')
+    user_email = request.user.get('email')
+    
+    return jsonify({
+        'user_id': user_id,
+        'email': user_email,
+        'message': 'Perfil de usuario obtenido exitosamente'
+    })

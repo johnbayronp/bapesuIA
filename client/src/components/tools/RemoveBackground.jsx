@@ -28,9 +28,13 @@ export default function RemoveBackground() {
     formData.append('image', selectedFile);
 
     try {
+      
+      const token = localStorage.getItem('access_token');
+
       const response = await axios.post('/api/remove-background', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         },
         responseType: 'blob' // Importante: especificar que esperamos un blob
       });
