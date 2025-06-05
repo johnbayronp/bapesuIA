@@ -30,12 +30,30 @@ export default function ProductDescription() {
     }));
   };
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(generatedDescription);
+    showSuccess('Descripción copiada al portapapeles');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsGenerating(true);
-
+    
     try {
-      const response = await axios.post('/api/generate-description', productInfo);
+      // Obtener el token del localStorage
+      const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        showError('No hay sesión activa. Por favor, inicia sesión.');
+        return;
+      }
+
+      const response = await axios.post('/api/generate-description', productInfo, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       setGeneratedDescription(response.data.description);
       showSuccess('Descripción generada con éxito');
     } catch (error) {
@@ -46,10 +64,6 @@ export default function ProductDescription() {
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(generatedDescription);
-    showSuccess('Descripción copiada al portapapeles');
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -89,7 +103,7 @@ export default function ProductDescription() {
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="Ej: Electrónica, Ropa, Servicios, etc."
                 required
-                maxLength={60}
+                maxLength={40}
               />
             </div>
 

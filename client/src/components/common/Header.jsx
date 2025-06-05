@@ -11,6 +11,7 @@ const Header = () => {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log(user);
       setUser(user);
     };
     getUser();
@@ -23,9 +24,16 @@ const Header = () => {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    navigate('/login');
+    try {
+      await supabase.auth.signOut();
+      // Limpiar los tokens al cerrar sesión
+      sessionStorage.removeItem('access_token');
+      localStorage.removeItem('access_token');
+      setUser(null);
+      navigate('/login');
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
   };
 
   return (

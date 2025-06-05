@@ -27,6 +27,9 @@ const Login = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         });
         if (error) {
           if (error.message.includes('already registered')) {
@@ -41,7 +44,7 @@ const Login = () => {
           setIsSignUp(false);
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -54,6 +57,8 @@ const Login = () => {
             showError(error.message);
           }
         } else {
+          // Guardar el token en localStorage y sessionStorage
+          localStorage.setItem('access_token', data.session.access_token);
           showSuccess('Inicio de sesión exitoso');
           navigate(from, { replace: true });
         }
