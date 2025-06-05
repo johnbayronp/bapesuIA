@@ -31,7 +31,7 @@ export default function RemoveBackground() {
       
       const token = localStorage.getItem('access_token');
 
-      const response = await axios.post('/api/remove-background', formData, {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/remove-background`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`

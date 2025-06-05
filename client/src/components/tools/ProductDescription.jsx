@@ -48,7 +48,7 @@ export default function ProductDescription() {
         return;
       }
 
-      const response = await axios.post('/api/generate-description', productInfo, {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/generate-description`, productInfo, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
