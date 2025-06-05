@@ -48,7 +48,11 @@ export default function ProductDescription() {
         return;
       }
 
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/generate-description`, productInfo, {
+      const baseURL = import.meta.env.MODE === 'development'
+      ? '/api' // usa proxy
+      : `${import.meta.env.VITE_API_URL}`; // producción
+
+      const response = await axios.post(`${baseURL}/generate-description`, productInfo, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
