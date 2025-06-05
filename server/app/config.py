@@ -15,7 +15,7 @@ class Config:
     SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
     
     # Configuración de CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173').split(',')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5000').split(',')
     
     # Configuración de API
     API_PREFIX = '/api'
