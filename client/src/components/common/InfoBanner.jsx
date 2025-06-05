@@ -12,7 +12,7 @@ export default function InfoBanner() {
               />
               <div>
                 <h2 className="text-4xl font-bold mb-2">Jhon B. Perez</h2>
-                <p className="text-blue-100 dark:text-blue-200 text-lg">Desarrollador de Software - Creado con IA</p>
+                <p className="text-blue-100 dark:text-blue-200 text-lg">Desarrollador de Software - Sitio Creado con IA</p>
               </div>
             </div>
           </div>

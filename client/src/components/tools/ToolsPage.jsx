@@ -27,7 +27,7 @@ export default function ToolsPage() {
                 Elimina el fondo de tus imágenes de forma automática usando IA
               </p>
               <Link
-                to="/remove-background"
+                to="/tools/remove-background"
                 className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300"
               >
                 Usar Herramienta
@@ -45,7 +45,7 @@ export default function ToolsPage() {
                 Crea descripciones profesionales para tus productos y servicios usando IA
               </p>
               <Link
-                to="/product-description"
+                to="/tools/product-description"
                 className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300"
               >
                 Usar Herramienta
