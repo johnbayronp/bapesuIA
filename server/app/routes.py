@@ -20,9 +20,15 @@ def hello():
     except Exception as e:
         abort(500, description=str(e))
 
-@app.route('/remove-background', methods=['POST'])
+@app.route('/remove-background', methods=['POST','OPTIONS'])
 @token_required
 def remove_background():
+    if request.method not in ['POST', 'OPTIONS']:
+        return jsonify({
+            'error': 'Método no permitido',
+            'message': 'Solo se permiten métodos POST y OPTIONS'
+        }), 405
+
     if 'image' not in request.files:
         return 'No image uploaded', 400
 
@@ -43,9 +49,17 @@ def remove_background():
     
     return send_file(img_io, mimetype='image/png')
 
-@app.route('/generate-description', methods=['POST'])
+@app.route('/generate-description', methods=['POST','OPTIONS'])
 @token_required
 def generate_description():
+
+    if request.method not in ['POST', 'OPTIONS']:
+        return jsonify({
+            'error': 'Método no permitido',
+            'message': 'Solo se permiten métodos POST y OPTIONS'
+        }), 405
+
+
     try:
         data = request.json
         # Validar datos requeridos
