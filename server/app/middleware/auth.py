@@ -8,6 +8,11 @@ from ..config import Config
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+
+        if request.method == 'OPTIONS':
+            return '', 200  # Permitir preflight sin validar token
+
+
         token = None
         # Obtener el token del header Authorization
         if 'Authorization' in request.headers:
