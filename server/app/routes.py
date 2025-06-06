@@ -28,6 +28,9 @@ def remove_background():
             'error': 'Método no permitido',
             'message': 'Solo se permiten métodos POST y OPTIONS'
         }), 405
+    
+    if request.method == 'OPTIONS':
+        return '', 200
 
     if 'image' not in request.files:
         return 'No image uploaded', 400
@@ -58,6 +61,9 @@ def generate_description():
             'error': 'Método no permitido',
             'message': 'Solo se permiten métodos POST y OPTIONS'
         }), 405
+
+    if request.method == 'OPTIONS':
+        return '', 200
 
 
     try:
