@@ -35,7 +35,7 @@ class Config:
     REMOVE_BG_API_KEY = os.getenv('REMOVE_BG_API_KEY')
 
     # Flask Configuration
-    HOST = os.getenv('FLASK_HOST', 'localhost')  # Para Docker
+    HOST = os.getenv('FLASK_HOST', '0.0.0.0')  # Para Docker
     PORT = int(os.getenv('PORT', '5000'))
 
     # Configuración de DeepSeek

@@ -130,7 +130,12 @@ def generate_description():
 @api_bp.route('/tools/generate-things-videos', methods=['POST','OPTIONS'])
 @token_required
 def generate_ideas_videos():
-    print("generate_ideas_videos")
+    if request.method == 'OPTIONS' :
+       response = jsonify(message='OPTIONS request received' )
+       response.headers.add("Access-Control-Allow-Origin", "*")
+       response.headers.add("Access-Control-Allow-Headers", "*")
+       response.headers.add("Access-Control-Allow-Methods", "*")
+       return response, 200
     
     data = request.json
     # Validar datos requeridos
