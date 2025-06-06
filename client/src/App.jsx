@@ -6,6 +6,7 @@ import ToolsPage from './components/tools/ToolsPage';
 import Login from './components/auth/Login';
 import ProductDescription from './components/tools/ProductDescription';
 import RemoveBackground from './components/tools/RemoveBackground';
+import VideoIdeas from './components/tools/VideoIdeas';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ThemeToggle from './components/themeUI/ThemeToggle';
 import { ThemeProvider } from './context/ThemeContext';
@@ -37,6 +38,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <RemoveBackground />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tools/video-ideas" 
+                element={
+                  <ProtectedRoute>
+                    <VideoIdeas/>
                   </ProtectedRoute>
                 } 
               />

@@ -1,26 +1,24 @@
-from app.app import app
 from flask import jsonify, abort, request, send_file, Blueprint
 import requests
 from rembg import remove
 from PIL import Image
 import io
 from app.config import Config
+from .services.gemini_service import GeminiService
 from .middleware.auth import token_required
 
-@app.route('/')
-def hello2():
-    try:
-        return jsonify(message="Hello, Front! I'm Flask")
-    except Exception as e:
-        abort(500, description=str(e))
-@app.route('/api')
+
+api_bp = Blueprint('/api/v1', __name__)
+
+@api_bp.route('/')
 def hello():
     try:
-        return jsonify(message="Hello, Front! I'm Flask")
+        return jsonify(message="Running API - Bapesu IA | V1 | By John perez | 2025")
     except Exception as e:
         abort(500, description=str(e))
 
-@app.route('/remove-background', methods=['POST','OPTIONS'])
+
+@api_bp.route('/tools/remove-background', methods=['POST','OPTIONS'])
 @token_required
 def remove_background():
     if request.method == 'OPTIONS' :
@@ -50,7 +48,8 @@ def remove_background():
     
     return send_file(img_io, mimetype='image/png')
 
-@app.route('/generate-description', methods=['POST','OPTIONS'])
+
+@api_bp.route('/tools/generate-description', methods=['POST','OPTIONS'])
 @token_required
 def generate_description():
 
@@ -127,23 +126,23 @@ def generate_description():
             'details': str(e)
         }), 500
 
-api_bp = Blueprint('api', __name__)
 
-@api_bp.route('/test', methods=['GET'])
-def test_auth():
-    return jsonify({
-        'message': 'Autenticación exitosa',
-        'user': request.user
-    })
-
-@api_bp.route('/user/profile', methods=['GET'])
+@api_bp.route('/tools/generate-things-videos', methods=['POST','OPTIONS'])
 @token_required
-def get_user_profile():
-    user_id = request.user.get('sub')
-    user_email = request.user.get('email')
+def generate_ideas_videos():
+    print("generate_ideas_videos")
     
-    return jsonify({
-        'user_id': user_id,
-        'email': user_email,
-        'message': 'Perfil de usuario obtenido exitosamente'
-    })
+    data = request.json
+    # Validar datos requeridos
+    required_fields = ['prompt']
+    
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Campo requerido faltante: {field}'}), 400
+        
+    # Crear un servicio externo para agregar la logica 
+    iaGemini = GeminiService()
+    
+    response = iaGemini.generate_ideas_videos(data['prompt'])
+
+    return jsonify(response),200

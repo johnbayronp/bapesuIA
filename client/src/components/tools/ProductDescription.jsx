@@ -3,6 +3,7 @@ import axios from 'axios';
 import useToast from '../../hooks/useToast';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
+import api from '../../lib/axiosConfig';
 
 export default function ProductDescription() {
   const { showSuccess, showError } = useToast();
@@ -48,15 +49,7 @@ export default function ProductDescription() {
         return;
       }
 
-      const baseURL = import.meta.env.MODE === 'development'
-      ? '/api' // usa proxy
-      : `${import.meta.env.VITE_API_URL}`; // producción
-
-      const response = await axios.post(`${baseURL}/generate-description`, productInfo, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await api.post(`/tools/generate-description`, productInfo);
       
       setGeneratedDescription(response.data.description);
       showSuccess('Descripción generada con éxito');

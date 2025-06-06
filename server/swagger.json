@@ -1,0 +1,23 @@
+{
+    "swagger": "2.0",
+    "info": {
+      "version": "1.0.0",
+      "title": "Mi API",
+      "description": "Documentación Swagger para mi API"
+    },
+    "host": "127.0.0.1:5000",
+    "basePath": "/",
+    "schemes": ["http"],
+    "paths": {
+      "/example": {
+        "get": {
+          "summary": "Endpoint de ejemplo",
+          "responses": {
+            "200": {
+              "description": "Respuesta exitosa"
+            }
+          }
+        }
+      }
+    }
+  }

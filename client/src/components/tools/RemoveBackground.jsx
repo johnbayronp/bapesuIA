@@ -3,6 +3,7 @@ import axios from 'axios';
 import useToast from '../../hooks/useToast';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
+import api from '../../lib/axiosConfig';
 
 export default function RemoveBackground() {
   const { showSuccess, showError } = useToast();
@@ -29,15 +30,9 @@ export default function RemoveBackground() {
 
     try {
       
-      const token = localStorage.getItem('access_token');
-      const baseURL = import.meta.env.MODE === 'development'
-      ? '/api' // usa proxy
-      : `${import.meta.env.VITE_API_URL}`; // producción
-
-      const response = await axios.post(`${baseURL}/remove-background`, formData, {
+      const response = await api.post(`/tools/remove-background`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
         },
         responseType: 'blob' // Importante: especificar que esperamos un blob
       });
