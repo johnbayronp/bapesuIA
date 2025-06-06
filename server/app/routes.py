@@ -23,14 +23,12 @@ def hello():
 @app.route('/remove-background', methods=['POST','OPTIONS'])
 @token_required
 def remove_background():
-    if request.method not in ['POST', 'OPTIONS']:
-        return jsonify({
-            'error': 'Método no permitido',
-            'message': 'Solo se permiten métodos POST y OPTIONS'
-        }), 405
-    
-    if request.method == 'OPTIONS':
-        return '', 200
+    if request.method == 'OPTIONS' :
+       response = jsonify(message='OPTIONS request received' )
+       response.headers.add("Access-Control-Allow-Origin", "*")
+       response.headers.add("Access-Control-Allow-Headers", "*")
+       response.headers.add("Access-Control-Allow-Methods", "*")
+       return response, 200
 
     if 'image' not in request.files:
         return 'No image uploaded', 400
@@ -56,15 +54,12 @@ def remove_background():
 @token_required
 def generate_description():
 
-    if request.method not in ['POST', 'OPTIONS']:
-        return jsonify({
-            'error': 'Método no permitido',
-            'message': 'Solo se permiten métodos POST y OPTIONS'
-        }), 405
-
-    if request.method == 'OPTIONS':
-        return '', 200
-
+    if request.method == 'OPTIONS' :
+       response = jsonify(message='OPTIONS request received' )
+       response.headers.add("Access-Control-Allow-Origin", "*")
+       response.headers.add("Access-Control-Allow-Headers", "*")
+       response.headers.add("Access-Control-Allow-Methods", "*")
+       return response, 200
 
     try:
         data = request.json
