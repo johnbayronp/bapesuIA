@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 app.config.from_object(Config)
 
-CORS(app, resources={r"/api/*": {"origins": "https://bapesu-ia.vercel.app/"}}, supports_credentials=True)
+CORS(app)
 
 
 from app import routes
