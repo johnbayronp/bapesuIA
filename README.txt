@@ -24,3 +24,7 @@ FLASK_DEBUG=1
 
 
 SUPABASE_JWT_SECRET=
+ 
+
+
+# pip install -r requirements.txt

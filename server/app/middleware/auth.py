@@ -8,7 +8,7 @@ from ..config import Config
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-
+        print("token_required")
         if request.method == 'OPTIONS':
             return '', 200  # Permitir preflight sin validar token
 

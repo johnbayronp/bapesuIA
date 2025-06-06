@@ -32,4 +32,4 @@ ENV PORT=5000
 
 # Comando para ejecutar la app
 #CMD ["python", "run.py"]
-CMD ["sh", "-c", "gunicorn --workers=4 --bind 0.0.0.0:${PORT:-5000} app.app:app"]
+CMD ["sh", "-c", "gunicorn --workers=4 --bind 0.0.0.0:${PORT:-5000} run:app"]

@@ -13,6 +13,8 @@ class Config:
     SUPABASE_URL = os.getenv('SUPABASE_URL')
     SUPABASE_KEY = os.getenv('SUPABASE_KEY')
     SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
+
+    GEMINI_API_KEY= os.getenv('GEMINI_API_KEY')
     
     # Configuración de CORS
     CORS_ORIGINS = [
@@ -24,7 +26,7 @@ class Config:
     ]
     
     # Configuración de API
-    API_PREFIX = '/api'
+    API_PREFIX = '/api/v1'
     
     # Configuración de servicios externos
     DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
@@ -33,12 +35,16 @@ class Config:
     REMOVE_BG_API_KEY = os.getenv('REMOVE_BG_API_KEY')
 
     # Flask Configuration
-    HOST = os.getenv('FLASK_HOST', '0.0.0.0')  # Para Docker
+    HOST = os.getenv('FLASK_HOST', 'localhost')  # Para Docker
     PORT = int(os.getenv('PORT', '5000'))
 
     # Configuración de DeepSeek
     DEEPSEEK_TEMPERATURE = float(os.getenv('DEEPSEEK_TEMPERATURE', '0.7'))
     DEEPSEEK_MAX_TOKENS = int(os.getenv('DEEPSEEK_MAX_TOKENS', '200'))
+
+    #swagger
+    SWAGGER_PREFIX = '/api/v1/docs'
+    API_URL = '/swagger.json'
 
     @classmethod
     def validate_config(cls):

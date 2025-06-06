@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { supabase } from './supabase';
 
+const baseURL = import.meta.env.MODE === 'production' ? import.meta.env.VITE_API_URL : 'http://localhost:5000/api/v1';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  baseURL: baseURL || 'http://127.0.0.1:5000/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
