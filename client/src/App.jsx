@@ -11,6 +11,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import ThemeToggle from './components/themeUI/ThemeToggle';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
+import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 
 function App() {
   useAuthRefresh();
@@ -46,6 +47,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <VideoIdeas/>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tools/whatsapp-link-generator" 
+                element={
+                  <ProtectedRoute>
+                    <WhatsappLinkGenerator />
                   </ProtectedRoute>
                 } 
               />
