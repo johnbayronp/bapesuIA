@@ -70,6 +70,24 @@ export default function ToolsPage() {
               </Link>
             </div>
           </div>
+
+          {/* Whatsapp Link Generator Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Generador de Link para WhatsApp
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Crea enlaces personalizados para enviar mensajes directos por WhatsApp fácilmente
+              </p>
+              <Link
+                to="/tools/whatsapp-link-generator"
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300"
+              >
+                Usar Herramienta
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
