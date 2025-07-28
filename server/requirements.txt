@@ -11,3 +11,4 @@ flask-swagger
 flask-swagger-ui
 flask-restful
 google-genai
+qrcode
