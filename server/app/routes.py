@@ -6,6 +6,7 @@ import io
 from app.config import Config
 from .services.gemini_service import GeminiService
 from .middleware.auth import token_required
+import qrcode
 
 
 api_bp = Blueprint('/api/v1', __name__)
@@ -138,7 +139,7 @@ def generate_ideas_videos():
        return response, 200
     
     data = request.json
-    # Validar datos requeridos
+    # Validar datos api
     required_fields = ['prompt']
     
     for field in required_fields:
@@ -151,3 +152,38 @@ def generate_ideas_videos():
     response = iaGemini.generate_ideas_videos(data['prompt'])
 
     return jsonify(response),200
+
+@api_bp.route('/tools/qr_generator', methods=['POST', 'OPTIONS'])
+@token_required
+def qr_generator():
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        data = request.json
+
+        # Validar entrada
+        if 'content' not in data or not data['content'].strip():
+            return jsonify({'error': 'No se proporcionó el contenido para el código QR'}), 400
+
+        import qrcode
+        import io
+        from flask import send_file
+
+        qr = qrcode.make(data['content'])
+
+        img_io = io.BytesIO()
+        qr.save(img_io, 'PNG')
+        img_io.seek(0)
+
+        return send_file(img_io, mimetype='image/png')
+
+    except Exception as e:
+        return jsonify({
+            'error': 'Error al generar el código QR',
+            'details': str(e)
+        }), 500

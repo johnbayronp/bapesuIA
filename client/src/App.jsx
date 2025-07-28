@@ -12,6 +12,7 @@ import ThemeToggle from './components/themeUI/ThemeToggle';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
 import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
+import QrGenerator from './components/tools/QrGenerator';
 
 function App() {
   useAuthRefresh();
@@ -58,7 +59,17 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route 
+                path="/tools/qr-generator" 
+                element={
+                  <ProtectedRoute>
+                    <QrGenerator/>
+                  </ProtectedRoute>
+                } 
+              />
             </Routes>
+            
+            
           </main>
           <ThemeToggle />
           <Footer />

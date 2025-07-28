@@ -88,9 +88,28 @@ export default function ToolsPage() {
               </Link>
             </div>
           </div>
+ {/* QR Generator card */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Generador de codigos QR
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Crea y genera codigos Qr profesionales para tus productos o para tu empresa
+              </p>
+              <Link
+                to="/tools/qr-generator"
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300"
+              >
+                Usar Herramienta
+              </Link>
+            </div>
+          </div>
+
+
+
         </div>
       </div>
-
        {/* Banner Informativo */}
        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-gray-800 dark:via-gray-900 dark:to-gray-950 text-white rounded-xl shadow-2xl p-12 mb-12 transition-colors duration-300">
         <InfoBanner />
