@@ -11,4 +11,4 @@ flask-swagger
 flask-swagger-ui
 flask-restful
 google-genai
-qrcode
+qrcode[pil]==7.4.2
