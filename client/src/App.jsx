@@ -17,6 +17,8 @@ import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
 import UserProfile from './components/auth/UserProfile';
 import UserProfileDebug from './components/auth/UserProfileDebug';
+import AdminDashboard from './components/admin/AdminDashboard';
+import AdminMiddleware from './components/auth/AdminMiddleware';
 
 function App() {
   useAuthRefresh();
@@ -90,6 +92,18 @@ function App() {
                     <QrGenerator/>
                   </ProtectedRoute>
                 } 
+              />
+              
+                            {/* Rutas del Administrador */}
+              <Route 
+                path="/admin/*" 
+                element={
+                  <ProtectedRoute>
+                    <AdminMiddleware>
+                      <AdminDashboard />
+                    </AdminMiddleware>
+                  </ProtectedRoute>
+                }
               />
             </Routes>
             

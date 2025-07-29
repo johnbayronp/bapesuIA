@@ -6,6 +6,7 @@ const Header = () => {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,15 +14,45 @@ const Header = () => {
       const { data: { user } } = await supabase.auth.getUser();
       console.log(user);
       setUser(user);
+      
+      // Verificar si es admin solo si hay usuario
+      if (user) {
+        checkAdminStatus(user.id);
+      }
     };
     getUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        checkAdminStatus(session.user.id);
+      } else {
+        setIsAdmin(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkAdminStatus = async (userId) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (!error && profile?.role === 'admin') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    } catch (err) {
+      console.error('Error checking admin status:', err);
+      setIsAdmin(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -30,6 +61,7 @@ const Header = () => {
       sessionStorage.removeItem('access_token');
       localStorage.removeItem('access_token');
       setUser(null);
+      setIsAdmin(false);
       navigate('/login');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
@@ -71,6 +103,11 @@ const Header = () => {
             <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
               Herramientas
             </Link>
+            {user && isAdmin && (
+              <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Administrador
+              </Link>
+            )}
             {user ? (
               <>
                 {/* Versión móvil */}

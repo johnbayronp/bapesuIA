@@ -36,33 +36,26 @@ const UserProfile = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Iniciando carga de perfil de usuario...');
-      
       // Obtener usuario actual
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
       
       if (authError) {
-        console.error('❌ Error al obtener usuario de auth:', authError);
         setError('Error al obtener datos del usuario autenticado');
         showError('Error de autenticación');
         return;
       }
 
       if (!currentUser) {
-        console.error('❌ No hay usuario autenticado');
         setError('No hay usuario autenticado');
         showError('Debes iniciar sesión para ver tu perfil');
         return;
       }
 
-      console.log('✅ Usuario autenticado:', currentUser.id, currentUser.email);
       setUser(currentUser);
 
       // Obtener perfil del usuario
-      console.log('🔍 Obteniendo perfil de usuario...');
       const userProfile = await userService.getUserProfile(currentUser.id);
       
-      console.log('✅ Perfil obtenido:', userProfile);
       setProfile(userProfile);
       
       // Llenar formulario con datos existentes
@@ -79,17 +72,14 @@ const UserProfile = () => {
         marketing_consent: userProfile.marketing_consent || false
       });
 
-      // Verificar si el perfil está completo
+      // Verificar si el perfil está completo (solo verificar campos básicos)
       const isProfileComplete = checkProfileCompleteness(userProfile);
-      console.log('📊 Perfil completo:', isProfileComplete);
       
       if (!isProfileComplete) {
-        console.log('⚠️ Perfil incompleto, mostrando formulario de completar');
         setIsCompletingProfile(true);
       }
 
     } catch (error) {
-      console.error('❌ Error al cargar perfil:', error);
       setError(error.message || 'Error al cargar el perfil del usuario');
       showError('Error al cargar el perfil del usuario');
     } finally {
@@ -97,18 +87,12 @@ const UserProfile = () => {
     }
   };
 
-  // Función para verificar si el perfil está completo
+  // Función para verificar si el perfil está completo (solo campos básicos)
   const checkProfileCompleteness = (profile) => {
     if (!profile) return false;
     
-    return profile.first_name && 
-           profile.last_name && 
-           profile.phone && 
-           profile.address && 
-           profile.city && 
-           profile.state && 
-           profile.postal_code && 
-           profile.country;
+    // Solo verificar campos básicos, no todos los campos opcionales
+    return profile.first_name && profile.last_name;
   };
 
   const handleInputChange = (e) => {
@@ -122,17 +106,14 @@ const UserProfile = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      console.log('💾 Guardando cambios en perfil...');
       
       const updatedProfile = await userService.updateUserProfile(user.id, formData);
-      console.log('✅ Perfil actualizado:', updatedProfile);
       
       setProfile(updatedProfile);
       setIsEditing(false);
       setIsCompletingProfile(false);
       showSuccess('Perfil actualizado correctamente');
     } catch (error) {
-      console.error('❌ Error al actualizar perfil:', error);
       showError('Error al actualizar el perfil');
     } finally {
       setSaving(false);
@@ -142,16 +123,13 @@ const UserProfile = () => {
   const handleCompleteProfile = async () => {
     try {
       setSaving(true);
-      console.log('✅ Completando perfil de usuario...');
       
       const updatedProfile = await userService.updateUserProfile(user.id, formData);
-      console.log('✅ Perfil completado:', updatedProfile);
       
       setProfile(updatedProfile);
       setIsCompletingProfile(false);
       showSuccess('¡Perfil completado exitosamente!');
     } catch (error) {
-      console.error('❌ Error al completar perfil:', error);
       showError('Error al completar el perfil');
     } finally {
       setSaving(false);
@@ -482,6 +460,133 @@ const UserProfile = () => {
         </div>
 
         <div className="space-y-6">
+          {/* Estadísticas de la tienda - PRIMERAS */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Estadísticas de la Tienda</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Total Gastado */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full"></div>
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-16 h-16 bg-white/5 rounded-full"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs opacity-80">Total Gastado</div>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold mb-1">
+                    ${profile.total_spent || 0}
+                  </div>
+                  <div className="text-xs opacity-80">
+                    En compras realizadas
+                  </div>
+                </div>
+              </div>
+
+              {/* Puntos de Fidelidad */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-20 h-20 bg-white/10 rounded-full"></div>
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-12 h-12 bg-white/5 rounded-full"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs opacity-80">Puntos</div>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold mb-1">
+                    {profile.loyalty_points || 0}
+                  </div>
+                  <div className="text-xs opacity-80">
+                    De fidelidad acumulados
+                  </div>
+                </div>
+              </div>
+
+              {/* Pedidos Realizados */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-16 h-16 bg-white/10 rounded-full"></div>
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-20 h-20 bg-white/5 rounded-full"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs opacity-80">Pedidos</div>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold mb-1">
+                    {profile.order_history ? profile.order_history.length : 0}
+                  </div>
+                  <div className="text-xs opacity-80">
+                    Realizados en total
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Información adicional */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Estado de Cliente</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {profile.loyalty_points >= 100 ? 'Cliente VIP' : 
+                       profile.loyalty_points >= 50 ? 'Cliente Frecuente' : 
+                       profile.loyalty_points >= 10 ? 'Cliente Regular' : 'Cliente Nuevo'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Última Compra</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {profile.order_history && profile.order_history.length > 0 
+                        ? 'Hace 2 semanas' 
+                        : 'Aún no has realizado compras'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -642,61 +747,82 @@ const UserProfile = () => {
             </div>
           </div>
 
-          {/* Preferencias */}
+          {/* Preferencias - MEJORADAS */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Preferencias</h3>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="newsletter_subscription"
-                  checked={formData.newsletter_subscription}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Suscribirse al boletín de noticias
-                </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Newsletter */}
+              <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                formData.newsletter_subscription 
+                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' 
+                  : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50'
+              }`}>
+                <div className="flex items-center space-x-3">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                    formData.newsletter_subscription 
+                      ? 'bg-indigo-100 dark:bg-indigo-800' 
+                      : 'bg-gray-100 dark:bg-gray-600'
+                  }`}>
+                    <svg className={`w-5 h-5 ${
+                      formData.newsletter_subscription 
+                        ? 'text-indigo-600 dark:text-indigo-400' 
+                        : 'text-gray-400 dark:text-gray-500'
+                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">Boletín de Noticias</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Recibe actualizaciones y novedades</p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      name="newsletter_subscription"
+                      checked={formData.newsletter_subscription}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="marketing_consent"
-                  checked={formData.marketing_consent}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Recibir ofertas y promociones por email
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Estadísticas de la tienda */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Estadísticas de la Tienda</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Gastado</p>
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                  ${profile.total_spent || 0}
-                </p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Puntos de Fidelidad</p>
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                  {profile.loyalty_points || 0}
-                </p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Pedidos Realizados</p>
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                  {profile.order_history ? profile.order_history.length : 0}
-                </p>
+              {/* Marketing */}
+              <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                formData.marketing_consent 
+                  ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
+                  : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50'
+              }`}>
+                <div className="flex items-center space-x-3">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                    formData.marketing_consent 
+                      ? 'bg-green-100 dark:bg-green-800' 
+                      : 'bg-gray-100 dark:bg-gray-600'
+                  }`}>
+                    <svg className={`w-5 h-5 ${
+                      formData.marketing_consent 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-gray-400 dark:text-gray-500'
+                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">Ofertas y Promociones</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Descuentos exclusivos por email</p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      name="marketing_consent"
+                      checked={formData.marketing_consent}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
