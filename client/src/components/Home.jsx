@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import AdBanner from './adsence/anuncios';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -54,6 +55,7 @@ const Home = () => {
           </div>
         ))}
       </div>
+      <AdBanner /> 
     </div>
   );
 };
