@@ -8,9 +8,7 @@ export default function ToolsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <div className='my-6'>
-            <AdBanner />
-          </div>
+         
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Herramientas de IA
           </h1>
@@ -119,6 +117,10 @@ export default function ToolsPage() {
       {/* Banner Informativo */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-gray-800 dark:via-gray-900 dark:to-gray-950 text-white rounded-xl shadow-2xl p-12 mb-12 transition-colors duration-300">
         <InfoBanner />
+      </div>
+      <p  style={{ color:"white" }}>Publicidad</p>
+      <div className='my-6'>
+        <AdBanner />
       </div>
 
     </div>
