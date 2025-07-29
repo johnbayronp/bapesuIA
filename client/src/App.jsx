@@ -4,6 +4,8 @@ import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 import ToolsPage from './components/tools/ToolsPage';
 import Login from './components/auth/Login';
+import ForgotPassword from './components/auth/ForgotPassword';
+import ResetPassword from './components/auth/ResetPassword';
 import ProductDescription from './components/tools/ProductDescription';
 import RemoveBackground from './components/tools/RemoveBackground';
 import VideoIdeas from './components/tools/VideoIdeas';
@@ -13,6 +15,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
 import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
+import UserProfile from './components/auth/UserProfile';
+import UserProfileDebug from './components/auth/UserProfileDebug';
 
 function App() {
   useAuthRefresh();
@@ -26,7 +30,27 @@ function App() {
             <Routes>
               <Route path="/" element={<ToolsPage />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/change-password" element={<ResetPassword />} />
               <Route path="/tools" element={<ToolsPage />} />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                } 
+              />
+              {/* Ruta temporal de debug */}
+              <Route 
+                path="/profile-debug" 
+                element={
+                  <ProtectedRoute>
+                    <UserProfileDebug />
+                  </ProtectedRoute>
+                } 
+              />
               <Route 
                 path="/tools/product-description" 
                 element={
