@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import AdBanner from './adsence/anuncios';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ const Home = () => {
         <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
           Herramientas de IA
         </h1>
+        <AdBanner /> 
         <p className="text-xl text-gray-600 dark:text-gray-300">
           Potencia tu productividad con nuestras herramientas impulsadas por IA
         </p>

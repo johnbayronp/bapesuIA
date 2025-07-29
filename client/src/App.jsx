@@ -13,12 +13,13 @@ import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
 import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
-
+import AdScriptLoader from './components/adsence/AdScriptLoader';
 function App() {
   useAuthRefresh();
   
   return (
     <ThemeProvider>
+    <AdScriptLoader/>
       <Router>
         <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-300">
           <Header />

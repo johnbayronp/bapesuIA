@@ -1,13 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import InfoBanner from '../common/InfoBanner';
-
+import AdBanner from '../adsence/AdBanner';
 export default function ToolsPage() {
   return (
     <div className="space-y-8">
-     
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
+          <div className='my-6'>
+            <AdBanner />
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Herramientas de IA
           </h1>
@@ -70,7 +73,9 @@ export default function ToolsPage() {
               </Link>
             </div>
           </div>
-
+          <div className='my-6'>
+            <AdBanner />
+          </div>
           {/* Whatsapp Link Generator Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105">
             <div className="p-6">
@@ -88,7 +93,11 @@ export default function ToolsPage() {
               </Link>
             </div>
           </div>
- {/* QR Generator card */}
+          <div className='my-6'>
+            <AdBanner />
+          </div>
+
+          {/* QR Generator card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105">
             <div className="p-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
@@ -105,13 +114,10 @@ export default function ToolsPage() {
               </Link>
             </div>
           </div>
-
-
-
         </div>
       </div>
-       {/* Banner Informativo */}
-       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-gray-800 dark:via-gray-900 dark:to-gray-950 text-white rounded-xl shadow-2xl p-12 mb-12 transition-colors duration-300">
+      {/* Banner Informativo */}
+      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-gray-800 dark:via-gray-900 dark:to-gray-950 text-white rounded-xl shadow-2xl p-12 mb-12 transition-colors duration-300">
         <InfoBanner />
       </div>
 
