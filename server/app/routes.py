@@ -6,6 +6,8 @@ import io
 from app.config import Config
 from .services.gemini_service import GeminiService
 from .services.user_service import UserService
+from .services.product_service import ProductService
+from .services.category_service import CategoryService
 from .middleware.auth import token_required, admin_required
 import qrcode
 
@@ -575,3 +577,561 @@ def get_user_stats():
             'success': False,
             'error': str(e)
         }), 500
+
+
+# ==================== RUTAS DE PRODUCTOS ====================
+
+@api_bp.route('/products', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_products():
+    """
+    Obtener productos con paginación y filtros
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        
+        # Obtener parámetros de consulta
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        # Obtener filtros
+        filters = {}
+        if request.args.get('category'):
+            filters['category'] = request.args.get('category')
+        if request.args.get('status'):
+            filters['status'] = request.args.get('status')
+        if request.args.get('search'):
+            filters['search'] = request.args.get('search')
+        if request.args.get('min_price'):
+            filters['min_price'] = request.args.get('min_price')
+        if request.args.get('max_price'):
+            filters['max_price'] = request.args.get('max_price')
+        if request.args.get('featured') is not None:
+            filters['featured'] = request.args.get('featured').lower() == 'true'
+        if request.args.get('in_stock') is not None:
+            filters['in_stock'] = request.args.get('in_stock').lower() == 'true'
+        
+        # Obtener productos
+        result = product_service.get_products(page=page, per_page=per_page, filters=filters)
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/<product_id>', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_product(product_id):
+    """
+    Obtener un producto específico por ID
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        product = product_service.get_product_by_id(product_id)
+        
+        if not product:
+            return jsonify({
+                'success': False,
+                'error': 'Producto no encontrado'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'data': product
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products', methods=['POST', 'OPTIONS'])
+@admin_required
+def create_product():
+    """
+    Crear un nuevo producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        
+        # Obtener datos del request
+        product_data = request.get_json()
+        
+        if not product_data:
+            return jsonify({
+                'success': False,
+                'error': 'Datos del producto requeridos'
+            }), 400
+        
+        # Crear producto
+        new_product = product_service.create_product(product_data)
+        
+        return jsonify({
+            'success': True,
+            'data': new_product,
+            'message': 'Producto creado exitosamente'
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/<product_id>', methods=['PUT', 'OPTIONS'])
+@admin_required
+def update_product(product_id):
+    """
+    Actualizar un producto existente
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        print(f"=== DEBUG: Endpoint update_product llamado ===")
+        print(f"Product ID: {product_id}")
+        print(f"Request data: {request.get_json()}")
+        
+        product_service = ProductService()
+        
+        # Obtener datos del request
+        product_data = request.get_json()
+        
+        if not product_data:
+            return jsonify({
+                'success': False,
+                'error': 'Datos del producto requeridos'
+            }), 400
+        
+        # Actualizar producto
+        updated_product = product_service.update_product(product_id, product_data)
+        
+        return jsonify({
+            'success': True,
+            'data': updated_product,
+            'message': 'Producto actualizado exitosamente'
+        }), 200
+        
+    except ValueError as e:
+        print(f"=== ERROR: ValueError en update_product: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except Exception as e:
+        print(f"=== ERROR: Exception en update_product: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/<product_id>', methods=['DELETE', 'OPTIONS'])
+@admin_required
+def delete_product(product_id):
+    """
+    Eliminar un producto (soft delete)
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        
+        # Eliminar producto
+        success = product_service.delete_product(product_id)
+        
+        if not success:
+            return jsonify({
+                'success': False,
+                'error': 'Error al eliminar el producto'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Producto eliminado exitosamente'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/<product_id>/hard-delete', methods=['DELETE', 'OPTIONS'])
+@admin_required
+def hard_delete_product(product_id):
+    """
+    Eliminar un producto permanentemente
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        
+        # Eliminar producto permanentemente
+        success = product_service.hard_delete_product(product_id)
+        
+        if not success:
+            return jsonify({
+                'success': False,
+                'error': 'Error al eliminar el producto permanentemente'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Producto eliminado permanentemente'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/<product_id>/stock', methods=['PATCH', 'OPTIONS'])
+@admin_required
+def update_product_stock(product_id):
+    """
+    Actualizar el stock de un producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        
+        # Obtener datos del request
+        data = request.get_json()
+        
+        if not data or 'stock' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Nuevo stock requerido'
+            }), 400
+        
+        new_stock = int(data['stock'])
+        
+        # Actualizar stock
+        updated_product = product_service.update_stock(product_id, new_stock)
+        
+        return jsonify({
+            'success': True,
+            'data': updated_product,
+            'message': 'Stock actualizado exitosamente'
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/stats', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_product_stats():
+    """
+    Obtener estadísticas de productos
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        stats = product_service.get_product_stats()
+        
+        return jsonify({
+            'success': True,
+            'data': stats
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/categories', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_product_categories():
+    """
+    Obtener lista de categorías de productos
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        categories = product_service.get_categories()
+        
+        return jsonify({
+            'success': True,
+            'data': categories
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/products/search', methods=['GET', 'OPTIONS'])
+@admin_required
+def search_products():
+    """
+    Buscar productos por término de búsqueda
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        product_service = ProductService()
+        
+        search_term = request.args.get('q', '')
+        limit = int(request.args.get('limit', 10))
+        
+        if not search_term:
+            return jsonify({
+                'success': False,
+                'error': 'Término de búsqueda requerido'
+            }), 400
+        
+        products = product_service.search_products(search_term, limit)
+        
+        return jsonify({
+            'success': True,
+            'data': products
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ============================================================================
+# RUTAS PARA CATEGORÍAS
+# ============================================================================
+
+@api_bp.route('/categories', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_categories():
+    """
+    Obtener todas las categorías con filtros opcionales
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        category_service = CategoryService()
+        
+        # Obtener parámetros de consulta
+        include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
+        
+        # Obtener filtros
+        filters = {}
+        if request.args.get('search'):
+            filters['search'] = request.args.get('search')
+        if request.args.get('status'):
+            filters['status'] = request.args.get('status')
+        
+        categories = category_service.get_categories(include_inactive, filters)
+        
+        return jsonify({
+            'success': True,
+            'data': categories
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/categories/<int:category_id>', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_category(category_id):
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        category_service = CategoryService()
+        category = category_service.get_category_by_id(category_id)
+        if not category:
+            return jsonify({'success': False, 'error': 'Categoría no encontrada'}), 404
+        return jsonify({'success': True, 'data': category}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/categories', methods=['POST', 'OPTIONS'])
+@admin_required
+def create_category():
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        category_service = CategoryService()
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+        data['created_by'] = request.user.get('id')
+        category = category_service.create_category(data)
+        return jsonify({'success': True, 'data': category, 'message': 'Categoría creada exitosamente'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/categories/<int:category_id>', methods=['PUT', 'OPTIONS'])
+@admin_required
+def update_category(category_id):
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        category_service = CategoryService()
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+        category = category_service.update_category(category_id, data)
+        return jsonify({'success': True, 'data': category, 'message': 'Categoría actualizada exitosamente'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/categories/<int:category_id>', methods=['DELETE', 'OPTIONS'])
+@admin_required
+def delete_category(category_id):
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        category_service = CategoryService()
+        success = category_service.delete_category(category_id)
+        if success:
+            return jsonify({'success': True, 'message': 'Categoría eliminada exitosamente'}), 200
+        else:
+            return jsonify({'success': False, 'error': 'Error al eliminar la categoría'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/categories/featured', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_featured_categories():
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        category_service = CategoryService()
+        categories = category_service.get_featured_categories()
+        return jsonify({'success': True, 'data': categories}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/categories/stats', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_category_stats():
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        category_service = CategoryService()
+        stats = category_service.get_category_stats()
+        return jsonify({'success': True, 'data': stats}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
