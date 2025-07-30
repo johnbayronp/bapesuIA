@@ -582,7 +582,6 @@ def get_user_stats():
 # ==================== RUTAS DE PRODUCTOS ====================
 
 @api_bp.route('/products', methods=['GET', 'OPTIONS'])
-@admin_required
 def get_products():
     """
     Obtener productos con paginación y filtros
@@ -634,7 +633,6 @@ def get_products():
 
 
 @api_bp.route('/products/<product_id>', methods=['GET', 'OPTIONS'])
-@admin_required
 def get_product(product_id):
     """
     Obtener un producto específico por ID
@@ -947,7 +945,6 @@ def get_product_categories():
 
 
 @api_bp.route('/products/search', methods=['GET', 'OPTIONS'])
-@admin_required
 def search_products():
     """
     Buscar productos por término de búsqueda
@@ -990,7 +987,6 @@ def search_products():
 # ============================================================================
 
 @api_bp.route('/categories', methods=['GET', 'OPTIONS'])
-@admin_required
 def get_categories():
     """
     Obtener todas las categorías con filtros opcionales
