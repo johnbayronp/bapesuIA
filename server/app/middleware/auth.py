@@ -13,7 +13,6 @@ def token_required(f):
         if request.method == 'OPTIONS':
             return '', 200  # Permitir preflight sin validar token
 
-
         token = None
         # Obtener el token del header Authorization
         if 'Authorization' in request.headers:
@@ -51,6 +50,7 @@ def token_required(f):
         except jwt.InvalidTokenError:
             return jsonify({'message': 'Token inválido'}), 401
         except Exception as e:
+            print(f"Error de autenticación: {str(e)}")
             return jsonify({'message': f'Error de autenticación: {str(e)}'}), 401
 
         return f(*args, **kwargs)

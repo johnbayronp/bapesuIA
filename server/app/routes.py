@@ -8,8 +8,10 @@ from .services.gemini_service import GeminiService
 from .services.user_service import UserService
 from .services.product_service import ProductService
 from .services.category_service import CategoryService
+from .services.order_service import OrderService
 from .middleware.auth import token_required, admin_required
 import qrcode
+from datetime import datetime
 
 
 api_bp = Blueprint('/api/v1', __name__)
@@ -1131,3 +1133,398 @@ def get_category_stats():
         return jsonify({'success': True, 'data': stats}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== ORDERS ROUTES ====================
+
+@api_bp.route('/orders/test', methods=['GET', 'POST', 'OPTIONS'])
+def test_orders_endpoint():
+    """
+    Endpoint de prueba para verificar que las rutas de órdenes funcionan
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        return jsonify({
+            'success': True,
+            'message': 'Endpoint de órdenes funcionando correctamente',
+            'method': request.method,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/orders', methods=['GET', 'POST', 'OPTIONS'])
+@token_required
+def orders_endpoint():
+    """
+    Manejar órdenes: GET para obtener órdenes del usuario, POST para crear nueva orden
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        
+        if request.method == 'POST':
+            # Crear una nueva orden
+            data = request.get_json()
+            
+            if not data:
+                return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+            
+            # Agregar el user_id del usuario autenticado
+            user_id = request.user.get('sub')
+            data['user_id'] = user_id
+            
+            print(f"Creating order with user_id: {user_id}")
+            print(f"request.user: {request.user}")
+            
+            result = order_service.create_order(data)
+            
+            if result['success']:
+                return jsonify(result), 201
+            else:
+                return jsonify(result), 400
+                
+        elif request.method == 'GET':
+            # Obtener las órdenes del usuario autenticado
+            user_id = request.user.get('sub')
+            
+            # Parámetros de paginación
+            limit = request.args.get('limit', 50, type=int)
+            offset = request.args.get('offset', 0, type=int)
+            
+            result = order_service.get_user_orders(user_id, limit, offset)
+            
+            if result['success']:
+                return jsonify(result), 200
+            else:
+                return jsonify(result), 400
+                
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/orders/<order_id>', methods=['GET', 'OPTIONS'])
+@token_required
+def get_order(order_id):
+    """
+    Obtener una orden específica
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        result = order_service.get_order(order_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 404
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/user/orders', methods=['GET', 'OPTIONS'])
+@token_required
+def get_user_orders():
+    """
+    Obtener todas las órdenes del usuario actual
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        # Obtener parámetros de paginación
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        status = request.args.get('status', None)
+        
+        # Calcular offset
+        offset = (page - 1) * limit
+        
+        order_service = OrderService()
+        user_id = request.user.get('sub')
+        
+        # Obtener órdenes del usuario
+        result = order_service.get_user_orders(user_id, limit=limit, offset=offset)
+     
+        
+        if result['success']:
+            # Filtrar por estado si se especifica
+            orders = result['data']
+            if status and status != 'all':
+                orders = [order for order in orders if order['status'] == status]
+            
+            # Agregar información de paginación
+            response_data = {
+                'success': True,
+                'data': orders,
+                'pagination': {
+                    'page': page,
+                    'limit': limit,
+                    'total': len(orders),
+                    'has_more': len(orders) == limit
+                },
+                'message': 'Órdenes obtenidas exitosamente'
+            }
+            
+            return jsonify(response_data), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/admin/orders', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_all_orders():
+    """
+    Obtener todas las órdenes (solo para administradores)
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        
+        # Parámetros de paginación y filtros
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        status = request.args.get('status')
+        
+        result = order_service.get_all_orders(limit, offset, status)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/admin/orders/<order_id>/status', methods=['PATCH', 'OPTIONS'])
+@admin_required
+def update_order_status(order_id):
+    """
+    Actualizar el estado de una orden (solo para administradores)
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        data = request.get_json()
+        
+        if not data or 'status' not in data:
+            return jsonify({'success': False, 'error': 'Estado requerido'}), 400
+        
+        result = order_service.update_order_status(order_id, data['status'])
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/admin/orders/<order_id>', methods=['PUT', 'OPTIONS'])
+@admin_required
+def update_order(order_id):
+    """
+    Actualizar una orden completa (solo para administradores)
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+        
+        result = order_service.update_order(order_id, data)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/admin/orders/<order_id>', methods=['DELETE', 'OPTIONS'])
+@admin_required
+def delete_order(order_id):
+    """
+    Eliminar una orden (solo para administradores)
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        result = order_service.delete_order(order_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/admin/orders/stats', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_order_stats():
+    """
+    Obtener estadísticas de las órdenes (solo para administradores)
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_service = OrderService()
+        result = order_service.get_order_stats()
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/user/orders/test', methods=['GET', 'OPTIONS'])
+@token_required
+def test_user_orders():
+    """
+    Endpoint de prueba para verificar la autenticación y el servicio de órdenes
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        user_id = request.user.get('sub')
+        print(f"Usuario autenticado: {user_id}")
+        
+        order_service = OrderService()
+        result = order_service.get_user_orders(user_id, limit=5, offset=0)
+        
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'orders_result': result,
+            'message': 'Prueba de autenticación y servicio de órdenes'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Error en prueba de autenticación'
+        }), 500
+
+@api_bp.route('/user/stats', methods=['GET', 'OPTIONS'])
+@token_required
+def get_current_user_stats():
+    """
+    Obtener estadísticas del usuario actual
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        user_id = request.user.get('sub')
+        order_service = OrderService()
+        
+        # Obtener todas las órdenes del usuario
+        result = order_service.get_user_orders(user_id, limit=1000, offset=0)
+        
+        if not result['success']:
+            return jsonify(result), 400
+        
+        orders = result['data']
+        
+        # Calcular estadísticas
+        total_spent = sum(float(order.get('total_amount', 0)) for order in orders)
+        total_orders = len(orders)
+        delivered_orders = len([order for order in orders if order.get('status') == 'delivered'])
+        
+        # Calcular puntos de fidelidad (1 punto por cada $10.000 gastados)
+        loyalty_points = int(total_spent / 10000)
+        
+        # Obtener última compra
+        last_order = None
+        if orders:
+            last_order = max(orders, key=lambda x: x.get('created_at', ''))
+        
+        stats = {
+            'total_spent': total_spent,
+            'total_orders': total_orders,
+            'delivered_orders': delivered_orders,
+            'loyalty_points': loyalty_points,
+            'last_order': last_order,
+            'order_history': orders[:5]  # Solo las últimas 5 órdenes
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': stats,
+            'message': 'Estadísticas obtenidas exitosamente'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Error al obtener estadísticas'
+        }), 500
