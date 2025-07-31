@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import LocationIndicator from './common/LocationIndicator';
 
 const Home = () => {
   const navigate = useNavigate();

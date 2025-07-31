@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { userService } from '../../lib/userService';
 import useToast from '../../hooks/useToast';
 import UserOrders from './UserOrders';
+import { formatCurrencyWithSymbol } from '../../utils/currencyFormatter';
 
 const UserProfile = () => {
   const [user, setUser] = useState(null);
@@ -540,7 +541,7 @@ const UserProfile = () => {
                     </div>
                   </div>
                   <div className="text-3xl font-bold mb-1">
-                    ${profile.total_spent || 0}
+                    {formatCurrencyWithSymbol(profile.total_spent || 0)}
                   </div>
                   <div className="text-xs opacity-80">
                     En compras realizadas

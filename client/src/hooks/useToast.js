@@ -9,11 +9,15 @@ const useToast = () => {
     toast.error(message, { position: 'top-center' });
   };
 
+  const showInfo = (message) => {
+    toast.info(message, { position: 'top-center' });
+  };
+
   const showPromise = (promise, messages) => {
     toast.promise(promise, messages, { position: 'top-center' });
   };
 
-  return { showSuccess, showError, showPromise };
+  return { showSuccess, showError, showInfo, showPromise };
 };
 
 export default useToast; 

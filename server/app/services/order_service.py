@@ -40,7 +40,9 @@ class OrderService:
                 'shipping_method': order_data['shipping_method'],
                 'status': order_data.get('status', 'pending'),
                 'comments': order_data.get('comments'),
-                'whatsapp_sent': order_data.get('whatsapp_sent', True)
+                'whatsapp_sent': order_data.get('whatsapp_sent', True),
+                'tracking_number': order_data.get('tracking_number'),
+                'tracking_url': order_data.get('tracking_url')
             }
             
             # Crear la orden
@@ -258,7 +260,7 @@ class OrderService:
             allowed_fields = [
                 'status', 'customer_name', 'customer_email', 'customer_phone',
                 'shipping_address', 'shipping_city', 'shipping_state', 
-                'shipping_zip_code', 'comments'
+                'shipping_zip_code', 'comments', 'tracking_number', 'tracking_url'
             ]
             
             # Filtrar solo los campos permitidos

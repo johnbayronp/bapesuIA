@@ -149,7 +149,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
 
           {/* Footer */}
           {cart.length > 0 && (
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4 mb-20">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-lg font-medium text-gray-900 dark:text-white">
                   Total:

@@ -40,6 +40,10 @@ CREATE TABLE orders (
     comments TEXT,
     whatsapp_sent BOOLEAN DEFAULT FALSE,
     
+    -- Información de tracking
+    tracking_number VARCHAR(100),
+    tracking_url TEXT,
+    
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -68,6 +72,7 @@ CREATE TABLE order_items (
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
+CREATE INDEX idx_orders_tracking_number ON orders(tracking_number);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 
@@ -163,4 +168,30 @@ COMMENT ON TABLE orders IS 'Tabla para almacenar las órdenes del ecommerce';
 COMMENT ON TABLE order_items IS 'Tabla para almacenar los items de cada orden';
 COMMENT ON COLUMN orders.order_number IS 'Número único de la orden generado automáticamente';
 COMMENT ON COLUMN orders.status IS 'Estado del pedido: pending, confirmed, processing, shipped, delivered, cancelled';
-COMMENT ON COLUMN orders.whatsapp_sent IS 'Indica si se envió la información por WhatsApp'; 
+COMMENT ON COLUMN orders.whatsapp_sent IS 'Indica si se envió la información por WhatsApp';
+COMMENT ON COLUMN orders.tracking_number IS 'Número de guía de envío para tracking';
+COMMENT ON COLUMN orders.tracking_url IS 'URL del link de tracking del envío';
+
+-- Función para validar tracking cuando el estado es shipped
+CREATE OR REPLACE FUNCTION validate_shipping_tracking()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si el estado es 'shipped', verificar que tenga tracking_number
+    IF NEW.status = 'shipped' AND (NEW.tracking_number IS NULL OR NEW.tracking_number = '') THEN
+        RAISE EXCEPTION 'El número de guía es obligatorio cuando el estado es "shipped"';
+    END IF;
+    
+    -- Si el estado es 'shipped', verificar que tenga tracking_url
+    IF NEW.status = 'shipped' AND (NEW.tracking_url IS NULL OR NEW.tracking_url = '') THEN
+        RAISE EXCEPTION 'El link de tracking es obligatorio cuando el estado es "shipped"';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Crear trigger para validar tracking cuando el estado es shipped
+CREATE TRIGGER trigger_validate_shipping_tracking
+    BEFORE INSERT OR UPDATE ON orders
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_shipping_tracking(); 

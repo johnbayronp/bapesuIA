@@ -37,7 +37,9 @@ const OrdersManagement = () => {
     shipping_city: '',
     shipping_state: '',
     shipping_zip_code: '',
-    comments: ''
+    comments: '',
+    tracking_number: '',
+    tracking_url: ''
   });
 
   useEffect(() => {
@@ -85,13 +87,34 @@ const OrdersManagement = () => {
       shipping_city: order.shipping_city,
       shipping_state: order.shipping_state,
       shipping_zip_code: order.shipping_zip_code,
-      comments: order.comments || ''
+      comments: order.comments || '',
+      tracking_number: order.tracking_number || '',
+      tracking_url: order.tracking_url || ''
     });
     setShowEditModal(true);
   };
 
   const handleUpdateOrder = async () => {
     try {
+      // Validar campos obligatorios cuando el estado es "enviado"
+      if (editForm.status === 'shipped') {
+        if (!editForm.tracking_number.trim()) {
+          alert('El número de guía es obligatorio cuando el estado es "Enviado"');
+          return;
+        }
+        if (!editForm.tracking_url.trim()) {
+          alert('El link de tracking es obligatorio cuando el estado es "Enviado"');
+          return;
+        }
+        // Validar que el URL sea válido
+        try {
+          new URL(editForm.tracking_url);
+        } catch {
+          alert('Por favor ingrese un link de tracking válido');
+          return;
+        }
+      }
+
       const token = localStorage.getItem('access_token');
       
       const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/orders/${editingOrder.id}`, {
@@ -109,7 +132,9 @@ const OrdersManagement = () => {
           shipping_city: editForm.shipping_city,
           shipping_state: editForm.shipping_state,
           shipping_zip_code: editForm.shipping_zip_code,
-          comments: editForm.comments
+          comments: editForm.comments,
+          tracking_number: editForm.tracking_number,
+          tracking_url: editForm.tracking_url
         })
       });
 
@@ -346,6 +371,9 @@ const OrdersManagement = () => {
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Tracking
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Fecha
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -376,6 +404,27 @@ const OrdersManagement = () => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
                       {getStatusText(order.status)}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {order.status === 'shipped' && order.tracking_number ? (
+                      <div>
+                        <div className="text-xs font-medium text-gray-900 dark:text-white">
+                          Guía: {order.tracking_number}
+                        </div>
+                        {order.tracking_url && (
+                          <a
+                            href={order.tracking_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                          >
+                            Ver tracking
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-500">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {new Date(order.created_at).toLocaleDateString('es-CO')}
@@ -509,6 +558,37 @@ const OrdersManagement = () => {
                     <option value="cancelled">Cancelado</option>
                   </select>
                 </div>
+
+                {/* Campos de tracking solo cuando el estado es "enviado" */}
+                {editForm.status === 'shipped' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Número de Guía <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.tracking_number}
+                        onChange={(e) => setEditForm({...editForm, tracking_number: e.target.value})}
+                        placeholder="Ingrese el número de guía"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Link de Tracking <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={editForm.tracking_url}
+                        onChange={(e) => setEditForm({...editForm, tracking_url: e.target.value})}
+                        placeholder="https://ejemplo.com/tracking/123456"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del cliente</label>

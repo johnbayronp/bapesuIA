@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   MagnifyingGlassIcon,
   ShoppingBagIcon,
-  HeartIcon,
-  StarIcon,
   ShoppingCartIcon
 } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { useEcommerce } from '../context/EcommerceContext';
 import CartSidebar from './common/CartSidebar';
 import CartFloatingButton from './common/FloatingButtons';
-import { formatCurrencyWithSymbol } from '../utils/currencyFormatter';
+import ProductCard from './shared/ProductCard';
+import LocationIndicator from './common/LocationIndicator';
 import { supabase } from '../lib/supabase';
 import useToast from '../hooks/useToast';
 
@@ -70,7 +68,7 @@ const Store = () => {
     
     // Si está autenticado, agregar normalmente
     addToCart(product);
-    showSuccess('Producto agregado al carrito');
+    // No mostrar toast aquí porque addToCart ya lo hace
   };
 
 
@@ -203,26 +201,7 @@ const Store = () => {
     return iconMap[categoryName] || '🛍️';
   };
 
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
 
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<StarIconSolid key={i} className="w-4 h-4 text-yellow-400" />);
-    }
-
-    if (hasHalfStar) {
-      stars.push(<StarIconSolid key="half" className="w-4 h-4 text-yellow-400" />);
-    }
-
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<StarIcon key={`empty-${i}`} className="w-4 h-4 text-gray-300" />);
-    }
-
-    return stars;
-  };
 
     return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -243,19 +222,17 @@ const Store = () => {
       )}
 
       {/* Header de la tienda */}
-      <div className="text-center py-12 px-4 relative">
-         <div className="flex items-center justify-center mb-4">
-           <ShoppingBagIcon className="h-12 w-12 text-indigo-600 dark:text-indigo-400 mr-4" />
-           <h1 className="text-5xl font-bold text-gray-900 dark:text-white">
-             Nuestra Tienda
-           </h1>
-         </div>
-         <p className="text-xl text-gray-600 dark:text-gray-300">
-           Descubre productos increíbles a precios increíbles
-         </p>
-         
-         
-       </div>
+      <div className="text-center py-12 px-4">
+        <div className="flex items-center justify-center mb-4">
+          <ShoppingBagIcon className="h-12 w-12 text-indigo-600 dark:text-indigo-400 mr-4" />
+          <h1 className="text-5xl font-bold text-gray-900 dark:text-white">
+            Nuestra Tienda
+          </h1>
+        </div>
+        <p className="text-xl text-gray-600 dark:text-gray-300">
+          Descubre productos increíbles a precios increíbles
+        </p>
+      </div>
 
       {/* Filtros de categorías */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
@@ -299,75 +276,16 @@ const Store = () => {
              <p className="text-gray-600 dark:text-gray-300 mt-4">Cargando productos...</p>
            </div>
          ) : (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-             {getFilteredProducts().map((product) => (
-                             <div
-                 key={product.id}
-                 className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-               >
-                {/* Imagen del producto */}
-                <div className="relative">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-48 object-cover"
-                  />
-                  {/* Etiqueta de descuento */}
-                  <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-bold">
-                    -{product.discount}%
-                  </div>
-                </div>
-
-                                 {/* Contenido del producto */}
-                 <div className="p-4">
-                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                     {product.name}
-                   </h3>
-                   <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">
-                     {product.description}
-                   </p>
-
-                   {/* Calificación */}
-                   <div className="flex items-center mb-3">
-                     <div className="flex items-center">
-                       {renderStars(product.rating)}
-                     </div>
-                     <span className="text-gray-500 dark:text-gray-400 text-sm ml-2">
-                       ({product.reviews})
-                     </span>
-                   </div>
-
-                                       {/* Precios */}
-                    <div className="flex items-center mb-4">
-                      <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {formatCurrencyWithSymbol(product.price)}
-                      </span>
-                      <span className="text-gray-400 line-through ml-2">
-                        {formatCurrencyWithSymbol(product.originalPrice)}
-                      </span>
-                    </div>
-
-                   {/* Botones de acción */}
-                   <div className="flex space-x-2">
-                                                                   <button
-                          onClick={() => handleAddToCart(product)}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-300"
-                        >
-                          Agregar al Carrito
-                        </button>
-                      <button
-                        onClick={() => addToWishlist(product)}
-                        className={`p-2 rounded-lg transition-colors duration-300 ${
-                          isInWishlist(product.id)
-                            ? 'bg-red-500 hover:bg-red-600 text-white'
-                            : 'bg-pink-500 hover:bg-pink-600 text-white'
-                        }`}
-                      >
-                        <HeartIcon className={`h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
-                      </button>
-                   </div>
-                 </div>
-              </div>
+                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {getFilteredProducts().map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAddToCart={handleAddToCart}
+                onAddToWishlist={addToWishlist}
+                isInWishlist={isInWishlist}
+                showDiscount={true}
+              />
             ))}
           </div>
         )}

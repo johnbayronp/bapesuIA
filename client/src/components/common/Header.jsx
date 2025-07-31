@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import CartIcon from './CartIcon';
@@ -12,6 +12,7 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { getCartCount, setCartOpen } = useEcommerce();
+  const userMenuRef = useRef(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -38,6 +39,23 @@ const Header = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Cerrar menú de usuario cuando se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
 
   const checkAdminStatus = async (userId) => {
     try {
@@ -73,7 +91,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-md transition-colors duration-300">
+    <header className="bg-white dark:bg-gray-800 shadow-md transition-colors duration-300 relative z-40">
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
         <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-white hover:text-indigo-700 dark:hover:text-gray-200 transition-colors duration-300">
           BAPESU | AI Tools
@@ -104,22 +122,40 @@ const Header = () => {
         {/* Menú de navegación */}
         <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block absolute md:relative top-16 md:top-0 left-0 w-full md:w-auto bg-white dark:bg-gray-800 shadow-lg md:shadow-none`}>
           <div className="px-2 pt-2 pb-3 space-y-1 md:space-y-0 md:flex md:items-center md:space-x-4">
-            <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-              Herramientas
-            </Link>
-            <Link to="/tienda" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-              Tienda
-            </Link>
-                         <button 
-                           className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 relative"
-                           onClick={() => {
-                             if (location.pathname === '/tienda') {
-                               setCartOpen(true);
-                             } else {
-                               navigate('/tienda');
-                             }
-                           }}
-                         >
+                         <Link 
+               to="/" 
+               className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                 location.pathname === '/' 
+                   ? 'bg-indigo-600 text-white shadow-lg' 
+                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+               }`}
+             >
+               Herramientas
+             </Link>
+                         <Link 
+               to="/tienda" 
+               className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                 location.pathname === '/tienda' 
+                   ? 'bg-indigo-600 text-white shadow-lg' 
+                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+               }`}
+             >
+               Tienda
+             </Link>
+                                                   <button 
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 relative ${
+                              location.pathname === '/tienda' 
+                                ? 'bg-indigo-600 text-white shadow-lg' 
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                            onClick={() => {
+                              if (location.pathname === '/tienda') {
+                                setCartOpen(true);
+                              } else {
+                                navigate('/tienda');
+                              }
+                            }}
+                          >
                            <CartIcon />
                            {getCartCount() > 0 && (
                              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
@@ -127,11 +163,18 @@ const Header = () => {
                              </span>
                            )}
                          </button>
-            {user && isAdmin && (
-              <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                Administrador
-              </Link>
-            )}
+                         {user && isAdmin && (
+               <Link 
+                 to="/admin" 
+                 className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                   location.pathname === '/admin' 
+                     ? 'bg-indigo-600 text-white shadow-lg' 
+                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                 }`}
+               >
+                 Administrador
+               </Link>
+             )}
             {user ? (
               <>
                 {/* Versión móvil */}
@@ -142,18 +185,27 @@ const Header = () => {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
-                      <button
-                        onClick={handleLogout}
-                        className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                      >
-                        Cerrar sesión
-                      </button>
+                      <div className="flex flex-col space-y-1 mt-1">
+                        <Link
+                          to="/profile"
+                          onClick={() => setIsMenuOpen(false)}
+                          className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+                        >
+                          Mi Perfil
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                        >
+                          Cerrar sesión
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Versión escritorio */}
-                <div className="hidden md:block relative">
+                <div className="hidden md:block relative" ref={userMenuRef}>
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     className="flex items-center space-x-2 focus:outline-none"
@@ -166,7 +218,7 @@ const Header = () => {
                   
                   {/* Menú desplegable del usuario */}
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-[60]">
                       <div className="py-1" role="menu" aria-orientation="vertical">
                         <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                           {user.email}
@@ -174,14 +226,14 @@ const Header = () => {
                         <Link
                           to="/profile"
                           onClick={() => setIsUserMenuOpen(false)}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                           role="menuitem"
                         >
                           Mi Perfil
                         </Link>
                         <button
                           onClick={handleLogout}
-                          className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900"
+                          className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 cursor-pointer"
                           role="menuitem"
                         >
                           Cerrar sesión

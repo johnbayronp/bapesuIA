@@ -1179,8 +1179,26 @@ def orders_endpoint():
             # Crear una nueva orden
             data = request.get_json()
             
+            print(f"Received order data: {data}")
+            
             if not data:
                 return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+            
+            # Validar campos requeridos
+            required_fields = ['customer_name', 'customer_email', 'customer_phone', 'shipping_address', 
+                             'shipping_city', 'shipping_state', 'shipping_zip_code', 'subtotal', 
+                             'shipping_cost', 'total_amount', 'payment_method', 'shipping_method', 'items']
+            
+            missing_fields = []
+            for field in required_fields:
+                if field not in data or not data[field]:
+                    missing_fields.append(field)
+            
+            if missing_fields:
+                return jsonify({
+                    'success': False, 
+                    'error': f'Campos requeridos faltantes: {", ".join(missing_fields)}'
+                }), 400
             
             # Agregar el user_id del usuario autenticado
             user_id = request.user.get('sub')
@@ -1188,8 +1206,11 @@ def orders_endpoint():
             
             print(f"Creating order with user_id: {user_id}")
             print(f"request.user: {request.user}")
+            print(f"Final order data: {data}")
             
             result = order_service.create_order(data)
+            
+            print(f"Order creation result: {result}")
             
             if result['success']:
                 return jsonify(result), 201
