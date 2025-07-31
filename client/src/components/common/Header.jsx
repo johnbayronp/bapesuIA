@@ -3,12 +3,15 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import CartIcon from './CartIcon';
 import { useEcommerce } from '../../context/EcommerceContext';
+import logoLight from '../../assets/logo-light.png';
+import logoDark from '../../assets/logo-dark.png';
 
 const Header = () => {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { getCartCount, setCartOpen } = useEcommerce();
@@ -38,6 +41,26 @@ const Header = () => {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Detectar modo oscuro
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+
+    // Verificar inicialmente
+    checkDarkMode();
+
+    // Observar cambios en el tema
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   // Cerrar menú de usuario cuando se hace clic fuera
@@ -93,8 +116,12 @@ const Header = () => {
   return (
     <header className="bg-white dark:bg-gray-800 shadow-md transition-colors duration-300 relative z-40">
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-        <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-white hover:text-indigo-700 dark:hover:text-gray-200 transition-colors duration-300">
-          BAPESU | AI Tools
+        <Link to="/" className="flex items-center">
+          <img 
+            src={isDarkMode ? logoDark : logoLight} 
+            alt="BAPESU AI Tools" 
+            className="h-8 w-auto"
+          />
         </Link>
 
         {/* Menú hamburguesa para móvil */}
@@ -122,59 +149,63 @@ const Header = () => {
         {/* Menú de navegación */}
         <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block absolute md:relative top-16 md:top-0 left-0 w-full md:w-auto bg-white dark:bg-gray-800 shadow-lg md:shadow-none`}>
           <div className="px-2 pt-2 pb-3 space-y-1 md:space-y-0 md:flex md:items-center md:space-x-4">
-                         <Link 
-               to="/" 
-               className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                 location.pathname === '/' 
-                   ? 'bg-indigo-600 text-white shadow-lg' 
-                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-               }`}
-             >
-               Herramientas
-             </Link>
-                         <Link 
-               to="/tienda" 
-               className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                 location.pathname === '/tienda' 
-                   ? 'bg-indigo-600 text-white shadow-lg' 
-                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-               }`}
-             >
-               Tienda
-             </Link>
-                                                   <button 
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 relative ${
-                              location.pathname === '/tienda' 
-                                ? 'bg-indigo-600 text-white shadow-lg' 
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                            }`}
-                            onClick={() => {
-                              if (location.pathname === '/tienda') {
-                                setCartOpen(true);
-                              } else {
-                                navigate('/tienda');
-                              }
-                            }}
-                          >
-                           <CartIcon />
-                           {getCartCount() > 0 && (
-                             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-                               {getCartCount() > 99 ? '99+' : getCartCount()}
-                             </span>
-                           )}
-                         </button>
-                         {user && isAdmin && (
-               <Link 
-                 to="/admin" 
-                 className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                   location.pathname === '/admin' 
-                     ? 'bg-indigo-600 text-white shadow-lg' 
-                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                 }`}
-               >
-                 Administrador
-               </Link>
-             )}
+            {/* Tienda - Primero */}
+            <Link 
+              to="/tienda" 
+              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                location.pathname === '/tienda' 
+                  ? 'bg-indigo-600 text-white shadow-lg' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              Tienda
+            </Link>
+            
+            {/* Herramientas IA */}
+            <Link 
+              to="/" 
+              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                location.pathname === '/' 
+                  ? 'bg-indigo-600 text-white shadow-lg' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              Herramientas IA
+            </Link>
+            
+            {/* Botón del carrito */}
+            <button 
+              className="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 relative text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => {
+                if (location.pathname === '/tienda') {
+                  setCartOpen(true);
+                } else {
+                  navigate('/tienda');
+                }
+              }}
+            >
+              <CartIcon />
+              {getCartCount() > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                  {getCartCount() > 99 ? '99+' : getCartCount()}
+                </span>
+              )}
+            </button>
+            
+            {/* Administrador - solo si es admin */}
+            {user && isAdmin && (
+              <Link 
+                to="/admin" 
+                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+                  location.pathname === '/admin' 
+                    ? 'bg-indigo-600 text-white shadow-lg' 
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Administrador
+              </Link>
+            )}
+            
             {user ? (
               <>
                 {/* Versión móvil */}

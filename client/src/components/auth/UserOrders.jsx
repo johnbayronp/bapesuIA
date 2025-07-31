@@ -8,7 +8,9 @@ import {
   XCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  LinkIcon,
+  ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
 import { formatCurrencyWithSymbol } from '../../utils/currencyFormatter';
 
@@ -149,6 +151,13 @@ const UserOrders = () => {
       default:
         return status;
     }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      // Opcional: mostrar un toast de confirmación
+      console.log('Copiado al portapapeles');
+    });
   };
 
   const paginate = (pageNumber) => {
@@ -315,6 +324,51 @@ const UserOrders = () => {
                       </p>
                     </div>
                   </div>
+
+                  {/* Información de tracking para pedidos enviados */}
+                  {order.status === 'shipped' && (order.tracking_number || order.tracking_url) && (
+                    <div className="mt-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <TruckIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                        <span className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                          Información de Seguimiento
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {order.tracking_number && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-indigo-700 dark:text-indigo-300">Guía:</span>
+                            <span className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                              {order.tracking_number}
+                            </span>
+                            <button
+                              onClick={() => copyToClipboard(order.tracking_number)}
+                              className="p-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200"
+                              title="Copiar guía"
+                            >
+                              <ClipboardDocumentIcon className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                        
+                        {order.tracking_url && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-indigo-700 dark:text-indigo-300">Seguimiento:</span>
+                            <a
+                              href={order.tracking_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 flex items-center space-x-1"
+                            >
+                              <span>Ver seguimiento</span>
+                              <LinkIcon className="h-3 w-3" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-shrink-0 ml-4">
@@ -458,6 +512,62 @@ const UserOrders = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Información de tracking para pedidos enviados */}
+                {selectedOrder.status === 'shipped' && (selectedOrder.tracking_number || selectedOrder.tracking_url) && (
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <TruckIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      <h4 className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                        Información de Seguimiento
+                      </h4>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {selectedOrder.tracking_number && (
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                          <div className="flex-1">
+                            <p className="text-xs text-indigo-700 dark:text-indigo-300 mb-1">Número de Guía</p>
+                            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                              {selectedOrder.tracking_number}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard(selectedOrder.tracking_number)}
+                            className="ml-3 p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-lg transition-colors"
+                            title="Copiar número de guía"
+                          >
+                            <ClipboardDocumentIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                      
+                      {selectedOrder.tracking_url && (
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                          <div className="flex-1">
+                            <p className="text-xs text-indigo-700 dark:text-indigo-300 mb-1">Link de Seguimiento</p>
+                            <a
+                              href={selectedOrder.tracking_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 flex items-center space-x-1"
+                            >
+                              <span>Ver seguimiento en línea</span>
+                              <LinkIcon className="h-4 w-4" />
+                            </a>
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard(selectedOrder.tracking_url)}
+                            className="ml-3 p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-lg transition-colors"
+                            title="Copiar URL de seguimiento"
+                          >
+                            <ClipboardDocumentIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Información del cliente */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
