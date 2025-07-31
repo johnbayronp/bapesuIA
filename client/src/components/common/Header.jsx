@@ -11,7 +11,6 @@ const Header = () => {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log(user);
       setUser(user);
     };
     getUser();
