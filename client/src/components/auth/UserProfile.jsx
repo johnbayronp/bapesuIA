@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { userService } from '../../lib/userService';
 import useToast from '../../hooks/useToast';
+import UserOrders from './UserOrders';
 
 const UserProfile = () => {
   const [user, setUser] = useState(null);
@@ -11,6 +12,7 @@ const UserProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isCompletingProfile, setIsCompletingProfile] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile');
   const { showSuccess, showError } = useToast();
 
   // Formulario de edición
@@ -56,7 +58,36 @@ const UserProfile = () => {
       // Obtener perfil del usuario
       const userProfile = await userService.getUserProfile(currentUser.id);
       
-      setProfile(userProfile);
+      // Obtener estadísticas de órdenes desde el backend
+      const token = localStorage.getItem('access_token');
+      const statsResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      let orderStats = {
+        total_spent: 0,
+        loyalty_points: 0,
+        order_history: []
+      };
+      
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        if (statsData.success) {
+          orderStats = statsData.data;
+        }
+      }
+      
+      // Combinar perfil con estadísticas de órdenes
+      const profileWithStats = {
+        ...userProfile,
+        total_spent: orderStats.total_spent,
+        loyalty_points: orderStats.loyalty_points,
+        order_history: orderStats.order_history
+      };
+      
+      setProfile(profileWithStats);
       
       // Llenar formulario con datos existentes
       setFormData({
@@ -449,7 +480,7 @@ const UserProfile = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Mi Perfil
           </h1>
-          {!isEditing && (
+          {!isEditing && activeTab === 'profile' && (
             <button
               onClick={() => setIsEditing(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors"
@@ -459,10 +490,37 @@ const UserProfile = () => {
           )}
         </div>
 
-        <div className="space-y-6">
-          {/* Estadísticas de la tienda - PRIMERAS */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Estadísticas de la Tienda</h3>
+        {/* Pestañas */}
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'profile'
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Perfil
+            </button>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'orders'
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              Mis Pedidos
+            </button>
+          </nav>
+        </div>
+
+        {activeTab === 'profile' ? (
+          <div className="space-y-6">
+            {/* Estadísticas de la tienda - PRIMERAS */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Estadísticas de la Tienda</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Total Gastado */}
               <div className="relative overflow-hidden bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
@@ -578,7 +636,11 @@ const UserProfile = () => {
                     <p className="text-sm font-medium text-gray-900 dark:text-white">Última Compra</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {profile.order_history && profile.order_history.length > 0 
-                        ? 'Hace 2 semanas' 
+                        ? new Date(profile.order_history[0].created_at).toLocaleDateString('es-CO', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })
                         : 'Aún no has realizado compras'}
                     </p>
                   </div>
@@ -846,6 +908,9 @@ const UserProfile = () => {
             </div>
           )}
         </div>
+      ) : (
+        <UserOrders />
+      )}
       </div>
     </div>
   );

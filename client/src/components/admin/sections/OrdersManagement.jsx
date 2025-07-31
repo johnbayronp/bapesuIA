@@ -1,155 +1,343 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShoppingCartIcon, 
   EyeIcon, 
   PencilIcon,
   TrashIcon,
-  FunnelIcon
+  FunnelIcon,
+  PlusIcon,
+  MagnifyingGlassIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
+import { formatCurrencyWithSymbol } from '../../../utils/currencyFormatter';
 
 const OrdersManagement = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingOrder, setDeletingOrder] = useState(null);
 
-  // Datos de ejemplo
-  const orders = [
-    {
-      id: '#ORD-001',
-      customer: 'Juan Pérez',
-      email: 'juan@example.com',
-      amount: '$299.99',
-      status: 'Completado',
-      date: '2024-01-15',
-      items: 3
-    },
-    {
-      id: '#ORD-002',
-      customer: 'María García',
-      email: 'maria@example.com',
-      amount: '$149.50',
-      status: 'En Proceso',
-      date: '2024-01-14',
-      items: 2
-    },
-    {
-      id: '#ORD-003',
-      customer: 'Carlos López',
-      email: 'carlos@example.com',
-      amount: '$89.99',
-      status: 'Pendiente',
-      date: '2024-01-13',
-      items: 1
-    },
-    {
-      id: '#ORD-004',
-      customer: 'Ana Martínez',
-      email: 'ana@example.com',
-      amount: '$199.99',
-      status: 'Cancelado',
-      date: '2024-01-12',
-      items: 4
+  // Estados para paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(10);
+
+  // Estados para el formulario de edición
+  const [editForm, setEditForm] = useState({
+    status: '',
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    shipping_address: '',
+    shipping_city: '',
+    shipping_state: '',
+    shipping_zip_code: '',
+    comments: ''
+  });
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al cargar las órdenes');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setOrders(data.data || []);
+      } else {
+        throw new Error(data.error || 'Error al cargar las órdenes');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error loading orders:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const handleEditOrder = (order) => {
+    setEditingOrder(order);
+    setEditForm({
+      status: order.status,
+      customer_name: order.customer_name,
+      customer_email: order.customer_email,
+      customer_phone: order.customer_phone,
+      shipping_address: order.shipping_address,
+      shipping_city: order.shipping_city,
+      shipping_state: order.shipping_state,
+      shipping_zip_code: order.shipping_zip_code,
+      comments: order.comments || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/orders/${editingOrder.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: editForm.status,
+          customer_name: editForm.customer_name,
+          customer_email: editForm.customer_email,
+          customer_phone: editForm.customer_phone,
+          shipping_address: editForm.shipping_address,
+          shipping_city: editForm.shipping_city,
+          shipping_state: editForm.shipping_state,
+          shipping_zip_code: editForm.shipping_zip_code,
+          comments: editForm.comments
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al actualizar la orden');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Actualizar la lista de órdenes
+        setOrders(orders.map(order => 
+          order.id === editingOrder.id 
+            ? { ...order, ...editForm }
+            : order
+        ));
+        setShowEditModal(false);
+        setEditingOrder(null);
+        alert('Orden actualizada exitosamente');
+      } else {
+        throw new Error(data.error || 'Error al actualizar la orden');
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+      console.error('Error updating order:', err);
+    }
+  };
+
+  const handleDeleteOrder = (order) => {
+    setDeletingOrder(order);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteOrder = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/orders/${deletingOrder.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al eliminar la orden');
+      }
+
+      // Remover la orden de la lista
+      setOrders(orders.filter(order => order.id !== deletingOrder.id));
+      setShowDeleteModal(false);
+      setDeletingOrder(null);
+      alert('Orden eliminada exitosamente');
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+      console.error('Error deleting order:', err);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Completado':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'En Proceso':
+      case 'pending':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'Pendiente':
+      case 'confirmed':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'Cancelado':
+      case 'processing':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      case 'shipped':
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+      case 'delivered':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'cancelled':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
     }
   };
 
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Pendiente';
+      case 'confirmed':
+        return 'Confirmado';
+      case 'processing':
+        return 'Procesando';
+      case 'shipped':
+        return 'Enviado';
+      case 'delivered':
+        return 'Entregado';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return status;
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus;
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = searchTerm === '' || 
+      order.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customer_email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
     return matchesStatus && matchesSearch;
   });
+
+  // Lógica de paginación
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+
+  const paginate = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedStatus, searchTerm]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+        <div className="flex">
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+            <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+              <p>{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Gestión de Pedidos
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Administra todos los pedidos de tu tienda
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Gestión de Pedidos</h2>
+          <p className="text-gray-600 dark:text-gray-400">Administra todas las órdenes del sistema</p>
         </div>
-        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
-          Exportar Pedidos
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={loadOrders}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Buscar
-            </label>
+          {/* Búsqueda */}
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
-              placeholder="Buscar por ID, cliente o email..."
+              placeholder="Buscar por número, cliente o email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             />
           </div>
+
+          {/* Filtro por estado */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Estado
-            </label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
             >
               <option value="all">Todos los estados</option>
-              <option value="Pendiente">Pendiente</option>
-              <option value="En Proceso">En Proceso</option>
-              <option value="Completado">Completado</option>
-              <option value="Cancelado">Cancelado</option>
+              <option value="pending">Pendiente</option>
+              <option value="confirmed">Confirmado</option>
+              <option value="processing">Procesando</option>
+              <option value="shipped">Enviado</option>
+              <option value="delivered">Entregado</option>
+              <option value="cancelled">Cancelado</option>
             </select>
           </div>
-          <div className="flex items-end">
-            <button className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-              <FunnelIcon className="h-5 w-5 inline mr-2" />
-              Filtrar
-            </button>
+
+          {/* Contador */}
+          <div className="flex items-center justify-end">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {filteredOrders.length} de {orders.length} órdenes
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Tabla de pedidos */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Pedidos ({filteredOrders.length})
-          </h3>
-        </div>
+      {/* Tabla de órdenes */}
+      <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Pedido
+                  Número
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Fecha
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Total
@@ -158,56 +346,54 @@ const OrdersManagement = () => {
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredOrders.map((order) => (
+              {currentOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <ShoppingCartIcon className="h-5 w-5 text-gray-400 mr-2" />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {order.id}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {order.items} items
-                        </div>
-                      </div>
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    {order.order_number}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {order.customer}
+                        {order.customer_name}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {order.email}
+                        {order.customer_email}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {order.date}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {order.amount}
+                    {formatCurrencyWithSymbol(order.total_amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                      {order.status}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                      {getStatusText(order.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300">
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {new Date(order.created_at).toLocaleDateString('es-CO')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleEditOrder(order)}
+                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        title="Editar"
+                      >
                         <PencilIcon className="h-4 w-4" />
                       </button>
-                      <button className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
+                      <button
+                        onClick={() => handleDeleteOrder(order)}
+                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        title="Eliminar"
+                      >
                         <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
@@ -217,27 +403,233 @@ const OrdersManagement = () => {
             </tbody>
           </table>
         </div>
+
+        {filteredOrders.length === 0 && (
+          <div className="text-center py-12">
+            <ShoppingCartIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No hay órdenes</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {searchTerm || selectedStatus !== 'all' 
+                ? 'No se encontraron órdenes con los filtros aplicados.'
+                : 'Aún no hay órdenes en el sistema.'
+              }
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Paginación */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-700 dark:text-gray-300">
-            Mostrando 1 a {filteredOrders.length} de {orders.length} resultados
-          </div>
-          <div className="flex space-x-2">
-            <button className="px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+      {filteredOrders.length > 0 && totalPages > 1 && (
+        <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Anterior
             </button>
-            <button className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 rounded-md">
-              1
-            </button>
-            <button className="px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Siguiente
             </button>
           </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Mostrando <span className="font-medium">{indexOfFirstOrder + 1}</span> a{' '}
+                <span className="font-medium">
+                  {Math.min(indexOfLastOrder, filteredOrders.length)}
+                </span>{' '}
+                de <span className="font-medium">{filteredOrders.length}</span> resultados
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Anterior</span>
+                  <ChevronLeftIcon className="h-5 w-5" />
+                </button>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
+                  <button
+                    key={pageNumber}
+                    onClick={() => paginate(pageNumber)}
+                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                      pageNumber === currentPage
+                        ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-300'
+                        : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+                
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Siguiente</span>
+                  <ChevronRightIcon className="h-5 w-5" />
+                </button>
+              </nav>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Modal de edición */}
+      {showEditModal && editingOrder && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Editar Orden</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="pending">Pendiente</option>
+                    <option value="confirmed">Confirmado</option>
+                    <option value="processing">Procesando</option>
+                    <option value="shipped">Enviado</option>
+                    <option value="delivered">Entregado</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del cliente</label>
+                  <input
+                    type="text"
+                    value={editForm.customer_name}
+                    onChange={(e) => setEditForm({...editForm, customer_name: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.customer_email}
+                    onChange={(e) => setEditForm({...editForm, customer_email: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono</label>
+                  <input
+                    type="text"
+                    value={editForm.customer_phone}
+                    onChange={(e) => setEditForm({...editForm, customer_phone: e.target.value})}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Dirección</label>
+                  <textarea
+                    value={editForm.shipping_address}
+                    onChange={(e) => setEditForm({...editForm, shipping_address: e.target.value})}
+                    rows={3}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ciudad</label>
+                    <input
+                      type="text"
+                      value={editForm.shipping_city}
+                      onChange={(e) => setEditForm({...editForm, shipping_city: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
+                    <input
+                      type="text"
+                      value={editForm.shipping_state}
+                      onChange={(e) => setEditForm({...editForm, shipping_state: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Comentarios</label>
+                  <textarea
+                    value={editForm.comments}
+                    onChange={(e) => setEditForm({...editForm, comments: e.target.value})}
+                    rows={3}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleUpdateOrder}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de eliminación */}
+      {showDeleteModal && deletingOrder && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Confirmar eliminación</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                ¿Estás seguro de que quieres eliminar la orden <strong className="text-gray-900 dark:text-white">{deletingOrder.order_number}</strong>? 
+                Esta acción no se puede deshacer.
+              </p>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteOrder}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

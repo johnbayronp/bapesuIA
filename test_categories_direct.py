@@ -4,107 +4,53 @@ Script para probar la tabla de categorías directamente en Supabase
 """
 import os
 import sys
+from dotenv import load_dotenv
 from supabase import create_client, Client
 
+# Cargar variables de entorno
+load_dotenv()
+
+# Configuración de Supabase
+supabase_url = os.getenv('SUPABASE_URL')
+supabase_key = os.getenv('SUPABASE_SERVICE_KEY')
+
+if not supabase_url or not supabase_key:
+    print("Error: SUPABASE_URL y SUPABASE_SERVICE_KEY deben estar definidos en el archivo .env")
+    print(f"SUPABASE_URL: {'Definido' if supabase_url else 'No definido'}")
+    print(f"SUPABASE_SERVICE_KEY: {'Definido' if supabase_key else 'No definido'}")
+    sys.exit(1)
+
 def test_categories_direct():
-    """Probar la tabla de categorías directamente en Supabase"""
-    print("=== Probando tabla de categorías directamente ===")
-    
-    # Configuración de Supabase (necesitarás actualizar estos valores)
-    SUPABASE_URL = "https://tu-proyecto.supabase.co"  # Actualiza con tu URL
-    SUPABASE_KEY = "tu-service-role-key"  # Actualiza con tu service role key
+    """Test direct access to categories table"""
+    print("Testing direct access to categories table...")
     
     try:
         # Crear cliente de Supabase
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase: Client = create_client(supabase_url, supabase_key)
         
-        # Verificar que la tabla existe
-        print("🔍 Verificando tabla de categorías...")
-        
-        # Intentar obtener categorías
+        # Consultar categorías
+        print("Querying categories table...")
         result = supabase.table('categories').select('*').execute()
         
-        if result.data:
-            print(f"✅ Tabla de categorías accesible")
-            print(f"📊 Categorías encontradas: {len(result.data)}")
-            
-            for cat in result.data:
-                print(f"  - {cat.get('name')} (ID: {cat.get('id')})")
-        else:
-            print("⚠️  No se encontraron categorías en la tabla")
-            
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        print("\n💡 Para usar este script:")
-        print("1. Actualiza SUPABASE_URL con tu URL de Supabase")
-        print("2. Actualiza SUPABASE_KEY con tu service role key")
-        print("3. Ejecuta el script setup_categories_table.sql en Supabase SQL Editor")
-
-def create_test_categories():
-    """Crear categorías de prueba"""
-    print("\n=== Creando categorías de prueba ===")
-    
-    # Configuración de Supabase (necesitarás actualizar estos valores)
-    SUPABASE_URL = "https://tu-proyecto.supabase.co"  # Actualiza con tu URL
-    SUPABASE_KEY = "tu-service-role-key"  # Actualiza con tu service role key
-    
-    test_categories = [
-        {
-            'name': 'Electrónicos',
-            'description': 'Productos electrónicos y tecnología',
-            'icon': 'DevicePhoneMobileIcon',
-            'color': '#3B82F6',
-            'is_featured': True,
-            'is_active': True,
-            'sort_order': 1
-        },
-        {
-            'name': 'Ropa',
-            'description': 'Ropa y accesorios de vestir',
-            'icon': 'ShoppingBagIcon',
-            'color': '#EF4444',
-            'is_featured': True,
-            'is_active': True,
-            'sort_order': 2
-        },
-        {
-            'name': 'Hogar',
-            'description': 'Productos para el hogar y decoración',
-            'icon': 'HomeIcon',
-            'color': '#10B981',
-            'is_featured': True,
-            'is_active': True,
-            'sort_order': 3
-        }
-    ]
-    
-    try:
-        # Crear cliente de Supabase
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print(f"Response status: {result}")
+        print(f"Number of categories found: {len(result.data)}")
         
-        for category in test_categories:
-            result = supabase.table('categories').insert(category).execute()
-            if result.data:
-                print(f"✅ Categoría creada: {category['name']}")
-            else:
-                print(f"❌ Error al crear categoría: {category['name']}")
-                
+        if result.data:
+            print("\nCategories found:")
+            for i, category in enumerate(result.data):
+                print(f"  {i+1}. {category.get('name', 'N/A')} (ID: {category.get('id', 'N/A')})")
+                print(f"      Active: {category.get('is_active', 'N/A')}")
+                print(f"      Featured: {category.get('is_featured', 'N/A')}")
+        else:
+            print("No categories found in database")
+            print("\nPossible issues:")
+            print("1. The categories table doesn't exist")
+            print("2. The setup_categories_table.sql script hasn't been executed")
+            print("3. RLS policies are blocking access")
+            
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        print("\n💡 Para usar este script:")
-        print("1. Actualiza SUPABASE_URL con tu URL de Supabase")
-        print("2. Actualiza SUPABASE_KEY con tu service role key")
+        print(f"Error testing categories table: {e}")
+        print(f"Error type: {type(e)}")
 
 if __name__ == "__main__":
-    print("🧪 Iniciando pruebas directas de categorías...")
-    print("⚠️  IMPORTANTE: Actualiza las variables SUPABASE_URL y SUPABASE_KEY en el script antes de ejecutar")
-    
-    test_categories_direct()
-    # create_test_categories()  # Descomenta para crear categorías de prueba
-    
-    print("\n✅ Pruebas completadas")
-    print("\n📝 Pasos para configurar categorías:")
-    print("1. Ve a Supabase SQL Editor")
-    print("2. Ejecuta el script database/setup_categories_table.sql")
-    print("3. Verifica que la tabla se creó correctamente")
-    print("4. Actualiza las variables en este script y ejecútalo para probar") 
+    test_categories_direct() 

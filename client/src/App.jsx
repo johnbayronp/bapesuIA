@@ -19,20 +19,29 @@ import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
 import UserProfile from './components/auth/UserProfile';
 import UserProfileDebug from './components/auth/UserProfileDebug';
+import UserOrders from './components/auth/UserOrders';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminMiddleware from './components/auth/AdminMiddleware';
+import Store from './components/Store';
+import Checkout from './components/Checkout';
+import CheckoutSuccess from './components/CheckoutSuccess';
+import { EcommerceProvider } from './context/EcommerceContext';
 
 function App() {
   useAuthRefresh();
   
   return (
     <ThemeProvider>
-      <Router>
-        <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-300">
-          <Header />
-          <main className="flex-grow container mx-auto px-4 py-8">
+      <EcommerceProvider>
+        <Router>
+          <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-300">
+            <Header />
+            <main className="flex-grow container mx-auto px-4 py-8">
             <Routes>
               <Route path="/" element={<ToolsPage />} />
+              <Route path="/tienda" element={<Store />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/checkout-success" element={<CheckoutSuccess />} />
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
@@ -43,6 +52,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <UserProfile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/orders" 
+                element={
+                  <ProtectedRoute>
+                    <UserOrders />
                   </ProtectedRoute>
                 } 
               />
@@ -110,9 +127,9 @@ function App() {
             </Routes>
             
             
-          </main>
-          <ThemeToggle />
-          <Footer />
+                     </main>
+           <ThemeToggle />
+           <Footer />
           <ToastContainer 
             position="top-center"
             autoClose={5000}
@@ -126,7 +143,8 @@ function App() {
             theme="light"
           />
         </div>
-      </Router>
+        </Router>
+      </EcommerceProvider>
     </ThemeProvider>
   );
 }

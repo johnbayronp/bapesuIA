@@ -212,6 +212,48 @@ export const userService = {
       console.error('Error en userExists:', error);
       return false;
     }
+  },
+
+  // Obtener estadísticas de órdenes del usuario
+  async getUserOrderStats(userId) {
+    try {
+      // Obtener todas las órdenes del usuario
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error al obtener órdenes del usuario:', error);
+        throw error;
+      }
+
+      // Calcular estadísticas
+      const totalSpent = orders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+      const totalOrders = orders.length;
+      const deliveredOrders = orders.filter(order => order.status === 'delivered').length;
+      
+      // Calcular puntos de fidelidad (1 punto por cada $10.000 gastados)
+      const loyaltyPoints = Math.floor(totalSpent / 10000);
+
+      return {
+        total_spent: totalSpent,
+        total_orders: totalOrders,
+        delivered_orders: deliveredOrders,
+        loyalty_points: loyaltyPoints,
+        order_history: orders
+      };
+    } catch (error) {
+      console.error('Error en getUserOrderStats:', error);
+      return {
+        total_spent: 0,
+        total_orders: 0,
+        delivered_orders: 0,
+        loyalty_points: 0,
+        order_history: []
+      };
+    }
   }
 };
 

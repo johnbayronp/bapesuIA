@@ -55,6 +55,11 @@ const ProductsManagement = () => {
     status: 'Activo'
   });
 
+  // Cargar categorías al montar el componente
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
   // Cargar productos al montar el componente
   useEffect(() => {
     if (activeTab === 'products') {
@@ -115,7 +120,6 @@ const ProductsManagement = () => {
   const loadCategories = async () => {
     try {
       setCategoriesLoading(true);
-      const token = localStorage.getItem('access_token');
       
       let url = `${import.meta.env.VITE_API_URL}/categories`;
       const params = new URLSearchParams();
@@ -133,22 +137,33 @@ const ProductsManagement = () => {
         url += `?${params.toString()}`;
       }
       
+      console.log('Loading categories from:', url);
+      
+      // El endpoint de categorías es público, no necesita token
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
+      console.log('Categories response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Categories response data:', data);
+        
         if (data.success) {
           // Guardar las categorías completas para el modal
           setFullCategories(data.data);
           // Extraer solo los nombres de las categorías para el selector
           const categoryNames = data.data.map(cat => cat.name);
+          console.log('Category names extracted:', categoryNames);
           setCategories(categoryNames);
+        } else {
+          console.error('Categories API returned success: false', data);
         }
+      } else {
+        console.error('Categories API error:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -271,7 +286,7 @@ const ProductsManagement = () => {
     }
   };
 
-  const handleEditProduct = (product) => {
+  const handleEditProduct = async (product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -283,12 +298,20 @@ const ProductsManagement = () => {
       is_featured: product.is_featured || false,
       status: product.status
     });
+    // Asegurar que las categorías estén cargadas antes de abrir el modal
+    if (categories.length === 0) {
+      await loadCategories();
+    }
     setShowModal(true);
   };
 
-  const handleCreateNew = () => {
+  const handleCreateNew = async () => {
     setEditingProduct(null);
     resetForm();
+    // Asegurar que las categorías estén cargadas antes de abrir el modal
+    if (categories.length === 0) {
+      await loadCategories();
+    }
     setShowModal(true);
   };
 

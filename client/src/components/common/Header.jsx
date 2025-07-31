@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import CartIcon from './CartIcon';
+import { useEcommerce } from '../../context/EcommerceContext';
 
 const Header = () => {
   const [user, setUser] = useState(null);
@@ -8,6 +10,8 @@ const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { getCartCount, setCartOpen } = useEcommerce();
 
   useEffect(() => {
     const getUser = async () => {
@@ -103,6 +107,26 @@ const Header = () => {
             <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
               Herramientas
             </Link>
+            <Link to="/tienda" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              Tienda
+            </Link>
+                         <button 
+                           className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 relative"
+                           onClick={() => {
+                             if (location.pathname === '/tienda') {
+                               setCartOpen(true);
+                             } else {
+                               navigate('/tienda');
+                             }
+                           }}
+                         >
+                           <CartIcon />
+                           {getCartCount() > 0 && (
+                             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                               {getCartCount() > 99 ? '99+' : getCartCount()}
+                             </span>
+                           )}
+                         </button>
             {user && isAdmin && (
               <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                 Administrador

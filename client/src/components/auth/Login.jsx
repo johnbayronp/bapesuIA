@@ -70,7 +70,13 @@ const Login = () => {
           }
           localStorage.setItem('access_token', data.session.access_token);
           showSuccess('Inicio de sesión exitoso');
-          navigate(from, { replace: true });
+          
+          // Si el usuario venía del checkout, redirigir al checkout
+          if (from === '/checkout') {
+            navigate('/checkout', { replace: true });
+          } else {
+            navigate(from, { replace: true });
+          }
         }
       }
     } catch (error) {
