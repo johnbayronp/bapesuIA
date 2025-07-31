@@ -7,6 +7,10 @@ from app.config import Config
 from .services.gemini_service import GeminiService
 from .middleware.auth import token_required
 import qrcode
+import os
+from dotenv import load_dotenv
+from google.cloud import texttospeech
+
 
 
 api_bp = Blueprint('/api/v1', __name__)
@@ -187,3 +191,82 @@ def qr_generator():
             'error': 'Error al generar el código QR',
             'details': str(e)
         }), 500
+    
+
+@api_bp.route('/tools/text_x_voz', methods=['POST', 'OPTIONS'])
+@token_required
+def text_to_speech():
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        load_dotenv()
+
+        data = request.json
+
+        if 'text' not in data or not data['text'].strip():
+            return jsonify({'error': 'No se proporcionó el texto para convertir a voz'}), 400
+
+        text = data['text']
+        voice_name = data.get('voice_name')  # Nuevo: nombre completo de la voz, opcional
+        language_code = data.get('language_code', 'es-ES')
+        gender_str = data.get('gender', 'NEUTRAL').upper()
+
+        valid_genders = ['MALE', 'FEMALE', 'NEUTRAL']
+        if gender_str not in valid_genders:
+            gender_str = 'NEUTRAL'
+
+        ssml_gender = getattr(texttospeech.SsmlVoiceGender, gender_str)
+
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+        client = texttospeech.TextToSpeechClient()
+
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+
+        # Si el usuario especifica un nombre de voz válido, lo usamos directamente
+        if voice_name:
+            voice = texttospeech.VoiceSelectionParams(
+                name=voice_name,
+                language_code=language_code,
+                ssml_gender=ssml_gender
+            )
+        else:
+            # Buscar voces por idioma
+            voices = client.list_voices(language_code=language_code).voices
+            filtered_voices = [v for v in voices if v.ssml_gender == ssml_gender]
+
+            selected_voice = filtered_voices[0] if filtered_voices else voices[0]
+
+            voice = texttospeech.VoiceSelectionParams(
+                name=selected_voice.name,
+                language_code=selected_voice.language_codes[0],
+                ssml_gender=selected_voice.ssml_gender
+            )
+
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3
+        )
+
+        response = client.synthesize_speech(
+            input=synthesis_input, voice=voice, audio_config=audio_config
+        )
+
+        audio_stream = io.BytesIO(response.audio_content)
+        audio_stream.seek(0)
+
+        return send_file(audio_stream, mimetype='audio/mpeg')
+
+    except Exception as e:
+        return jsonify({
+            'error': 'Error al generar el audio',
+            'details': str(e)
+        }), 500
+
+
+
+
+

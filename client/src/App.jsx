@@ -13,7 +13,10 @@ import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
 import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
+import TextXVoz from './components/tools/TextXVoz';
 import AdScriptLoader from './components/adsence/AdScriptLoader';
+
+
 function App() {
   useAuthRefresh();
   
@@ -65,6 +68,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <QrGenerator/>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tools/text-x-voz" 
+                element={
+                  <ProtectedRoute>
+                    <TextXVoz/>
                   </ProtectedRoute>
                 } 
               />
