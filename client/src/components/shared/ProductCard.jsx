@@ -31,6 +31,15 @@ const ProductCard = ({
 
   const renderStars = (rating) => {
     const stars = [];
+    
+    // Si no hay calificación, mostrar todas las estrellas vacías
+    if (!rating || rating === 0) {
+      for (let i = 0; i < 5; i++) {
+        stars.push(<StarIcon key={`empty-${i}`} className="w-4 h-4 text-gray-300" />);
+      }
+      return stars;
+    }
+    
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
 
@@ -83,7 +92,7 @@ const ProductCard = ({
             {renderStars(product.rating)}
           </div>
           <span className="text-gray-500 dark:text-gray-400 text-xs md:text-sm ml-2">
-            ({product.reviews})
+            {product.reviews > 0 ? `(${product.reviews})` : '(Sin calificaciones)'}
           </span>
         </div>
 

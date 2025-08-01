@@ -12,6 +12,7 @@ import {
   LinkIcon,
   ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { formatCurrencyWithSymbol } from '../../utils/currencyFormatter';
 
 const UserOrders = () => {
@@ -23,6 +24,7 @@ const UserOrders = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [productRatings, setProductRatings] = useState({});
 
   useEffect(() => {
     loadUserOrders();
@@ -85,6 +87,14 @@ const UserOrders = () => {
       const data = await response.json();
       
       if (data.success) {
+        console.log('Order details received:', data.data);
+        console.log('Order items:', data.data.items);
+        console.log('Order status:', data.data.status);
+        console.log('Items with product_id:', data.data.items?.map(item => ({
+          product_name: item.product_name,
+          product_id: item.product_id,
+          has_product_id: !!item.product_id
+        })));
         setSelectedOrder(data.data);
         setShowOrderDetails(true);
       } else {
@@ -158,6 +168,84 @@ const UserOrders = () => {
       // Opcional: mostrar un toast de confirmación
       console.log('Copiado al portapapeles');
     });
+  };
+
+  const handleProductRating = async (productId, rating) => {
+    try {
+      // Validar que el productId sea válido
+      if (!productId || productId <= 0) {
+        console.error('Product ID inválido:', productId);
+        alert('Error: ID de producto inválido');
+        return;
+      }
+
+      console.log('Enviando calificación:', { productId, rating, orderId: selectedOrder.id });
+
+      // Actualizar estado local inmediatamente para feedback visual
+      setProductRatings(prev => ({
+        ...prev,
+        [productId]: rating
+      }));
+
+      // Enviar calificación al backend
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/product-ratings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          product_id: productId,
+          order_id: selectedOrder.id,
+          rating: rating
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        console.error('Error al guardar calificación:', data.error);
+        // Revertir el estado local si hay error
+        setProductRatings(prev => {
+          const newState = { ...prev };
+          delete newState[productId];
+          return newState;
+        });
+        alert('Error al guardar la calificación: ' + data.error);
+      } else {
+        console.log('Calificación guardada exitosamente');
+      }
+    } catch (error) {
+      console.error('Error al enviar calificación:', error);
+      // Revertir el estado local si hay error
+      setProductRatings(prev => {
+        const newState = { ...prev };
+        delete newState[productId];
+        return newState;
+      });
+      alert('Error al guardar la calificación');
+    }
+  };
+
+  const renderStars = (productId, currentRating = 0) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <button
+          key={i}
+          onClick={() => handleProductRating(productId, i)}
+          className={`p-1 transition-colors ${
+            i <= currentRating 
+              ? 'text-yellow-400 hover:text-yellow-500' 
+              : 'text-gray-300 hover:text-yellow-400'
+          }`}
+        >
+          <StarIconSolid className="h-4 w-4" />
+        </button>
+      );
+    }
+    return stars;
   };
 
   const paginate = (pageNumber) => {
@@ -324,6 +412,37 @@ const UserOrders = () => {
                       </p>
                     </div>
                   </div>
+
+                  {/* Estado del pedido en línea */}
+                  {order.status !== 'cancelled' ? (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Estado del Pedido</p>
+                      <div className="flex items-center space-x-2">
+                        <div className={`flex-1 h-2 rounded-full ${order.status === 'pending' ? 'bg-yellow-400' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                        <div className={`flex-1 h-2 rounded-full ${order.status === 'confirmed' ? 'bg-blue-400' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                        <div className={`flex-1 h-2 rounded-full ${order.status === 'processing' ? 'bg-purple-400' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                        <div className={`flex-1 h-2 rounded-full ${order.status === 'shipped' ? 'bg-indigo-400' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                        <div className={`flex-1 h-2 rounded-full ${order.status === 'delivered' ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span>Pendiente</span>
+                        <span>Confirmado</span>
+                        <span>Procesando</span>
+                        <span>Enviado</span>
+                        <span>Entregado</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Estado del Pedido</p>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 h-2 rounded-full bg-red-400"></div>
+                      </div>
+                      <div className="flex justify-center text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                        Cancelado
+                      </div>
+                    </div>
+                  )}
 
                   {/* Información de tracking para pedidos enviados */}
                   {order.status === 'shipped' && (order.tracking_number || order.tracking_url) && (
@@ -591,29 +710,67 @@ const UserOrders = () => {
                   </div>
                 </div>
 
-                {/* Productos */}
-                {selectedOrder.items && selectedOrder.items.length > 0 && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Productos</h4>
-                    <div className="space-y-3">
-                      {selectedOrder.items.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-600 last:border-b-0">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {item.product_name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Cantidad: {item.quantity} × {formatCurrencyWithSymbol(item.product_price)}
-                            </p>
-                          </div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {formatCurrencyWithSymbol(item.total_price)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                                 {/* Productos */}
+                 {selectedOrder.items && selectedOrder.items.length > 0 && (
+                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                     <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Productos</h4>
+                     <div className="space-y-4">
+                       {selectedOrder.items.map((item, index) => {
+                         console.log(`Rendering item ${index}:`, {
+                           product_name: item.product_name,
+                           product_id: item.product_id,
+                           order_status: selectedOrder.status,
+                           should_show_stars: selectedOrder.status === 'delivered' && item.product_id
+                         });
+                         return (
+                         <div key={index} className="border-b border-gray-200 dark:border-gray-600 last:border-b-0 pb-4">
+                           <div className="flex justify-between items-start mb-2">
+                             <div className="flex-1">
+                               <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                 {item.product_name}
+                               </p>
+                               <p className="text-xs text-gray-500 dark:text-gray-400">
+                                 Cantidad: {item.quantity} × {formatCurrencyWithSymbol(item.product_price)}
+                               </p>
+                             </div>
+                             <div className="text-sm font-medium text-gray-900 dark:text-white">
+                               {formatCurrencyWithSymbol(item.total_price)}
+                             </div>
+                           </div>
+                           
+                                                       {/* Calificación del producto - solo para pedidos entregados */}
+                            {selectedOrder.status === 'delivered' && item.product_id && (
+                              <div className="mt-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                                    Califica este producto:
+                                  </span>
+                                  <div className="flex items-center space-x-1">
+                                    {renderStars(item.product_id, productRatings[item.product_id] || 0)}
+                                  </div>
+                                </div>
+                                {productRatings[item.product_id] && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Calificación: {productRatings[item.product_id]}/5 estrellas
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Mensaje para pedidos no entregados */}
+                            {selectedOrder.status !== 'delivered' && (
+                              <div className="mt-3">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                  Podrás calificar este producto cuando el pedido sea entregado
+                                </p>
+                              </div>
+                            )}
+                         </div>
+                       );
+                       })}
+                     </div>
+                   </div>
+                 )}
 
                 {/* Comentarios */}
                 {selectedOrder.comments && (

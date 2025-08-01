@@ -9,6 +9,7 @@ from .services.user_service import UserService
 from .services.product_service import ProductService
 from .services.category_service import CategoryService
 from .services.order_service import OrderService
+from .services.product_rating_service import ProductRatingService
 from .middleware.auth import token_required, admin_required
 import qrcode
 from datetime import datetime
@@ -1549,3 +1550,370 @@ def get_current_user_stats():
             'error': str(e),
             'message': 'Error al obtener estadísticas'
         }), 500
+
+
+# ==================== RUTAS DE CALIFICACIONES DE PRODUCTOS ====================
+
+@api_bp.route('/product-ratings', methods=['POST', 'OPTIONS'])
+@token_required
+def create_product_rating():
+    """
+    Crear una nueva calificación de producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        data = request.get_json()
+        print(f"DEBUG: Received data: {data}")  # Debug log
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+        
+        # Validar campos requeridos
+        required_fields = ['product_id', 'order_id', 'rating']
+        missing_fields = [field for field in required_fields if field not in data or data[field] is None]
+        
+        if missing_fields:
+            print(f"DEBUG: Missing fields: {missing_fields}")  # Debug log
+            return jsonify({
+                'success': False, 
+                'error': f'Campos requeridos faltantes: {", ".join(missing_fields)}'
+            }), 400
+        
+        # Validar que la calificación esté entre 1 y 5
+        if not (1 <= data['rating'] <= 5):
+            print(f"DEBUG: Invalid rating: {data['rating']}")  # Debug log
+            return jsonify({
+                'success': False, 
+                'error': 'La calificación debe estar entre 1 y 5'
+            }), 400
+        
+        user_id = request.user.get('sub')
+        print(f"DEBUG: User ID: {user_id}")  # Debug log
+        print(f"DEBUG: Product ID: {data['product_id']}")  # Debug log
+        print(f"DEBUG: Order ID: {data['order_id']}")  # Debug log
+        print(f"DEBUG: Rating: {data['rating']}")  # Debug log
+        
+        rating_service = ProductRatingService()
+        
+        # Verificar si el usuario puede calificar antes de intentar crear
+        can_rate = rating_service.can_user_rate_product(
+            user_id=user_id,
+            product_id=data['product_id'],
+            order_id=data['order_id']
+        )
+        print(f"DEBUG: Can user rate: {can_rate}")  # Debug log
+        
+        if not can_rate:
+            return jsonify({
+                'success': False,
+                'error': 'No puedes calificar este producto. Verifica que el pedido esté entregado y que hayas comprado este producto.'
+            }), 400
+        print(f"DEBUG: Creating rating , user_id: {user_id}, product_id: {data['product_id']}, order_id: {data['order_id']}, rating: {data['rating']}, comment: {data.get('comment')}")
+        result = rating_service.create_rating(
+            user_id=user_id,
+            product_id=data['product_id'],
+            order_id=data['order_id'],
+            rating=data['rating'],
+            comment=data.get('comment')
+        )
+        
+        print(f"DEBUG: Service result: {result}")  # Debug log
+        
+        if result and result.get('success'):
+            return jsonify(result), 201
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        print(f"DEBUG: Exception occurred: {str(e)}")  # Debug log
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/products/<int:product_id>/ratings', methods=['GET', 'OPTIONS'])
+def get_product_ratings(product_id):
+    """
+    Obtener calificaciones de un producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        rating_service = ProductRatingService()
+        result = rating_service.get_product_ratings(product_id, page, per_page)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/products/<int:product_id>/rating-stats', methods=['GET', 'OPTIONS'])
+def get_product_rating_stats(product_id):
+    """
+    Obtener estadísticas de calificaciones de un producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        rating_service = ProductRatingService()
+        result = rating_service.get_product_rating_stats(product_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/products/<int:product_id>/can-rate', methods=['GET', 'OPTIONS'])
+@token_required
+def can_user_rate_product(product_id):
+    """
+    Verificar si un usuario puede calificar un producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        order_id = request.args.get('order_id')
+        if not order_id:
+            return jsonify({'success': False, 'error': 'order_id es requerido'}), 400
+        
+        user_id = request.user.get('sub')
+        print(f"DEBUG: Checking if user {user_id} can rate product {product_id} for order {order_id}")
+        
+        rating_service = ProductRatingService()
+        
+        can_rate = rating_service.can_user_rate_product(user_id, product_id, order_id)
+        
+        print(f"DEBUG: Can rate result: {can_rate}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'can_rate': can_rate,
+                'user_id': user_id,
+                'product_id': product_id,
+                'order_id': order_id
+            }
+        }), 200
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/product-ratings/<rating_id>', methods=['PUT', 'OPTIONS'])
+@token_required
+def update_product_rating(rating_id):
+    """
+    Actualizar una calificación de producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Datos requeridos'}), 400
+        
+        # Validar que la calificación esté entre 1 y 5
+        if 'rating' in data and not (1 <= data['rating'] <= 5):
+            return jsonify({
+                'success': False, 
+                'error': 'La calificación debe estar entre 1 y 5'
+            }), 400
+        
+        user_id = request.user.get('sub')
+        rating_service = ProductRatingService()
+        
+        result = rating_service.update_rating(
+            rating_id=rating_id,
+            user_id=user_id,
+            rating=data.get('rating'),
+            comment=data.get('comment')
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/product-ratings/<rating_id>', methods=['DELETE', 'OPTIONS'])
+@token_required
+def delete_product_rating(rating_id):
+    """
+    Eliminar una calificación de producto
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        user_id = request.user.get('sub')
+        rating_service = ProductRatingService()
+        
+        result = rating_service.delete_rating(rating_id, user_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/user/ratings', methods=['GET', 'OPTIONS'])
+@token_required
+def get_user_ratings():
+    """
+    Obtener todas las calificaciones del usuario actual
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        user_id = request.user.get('sub')
+        rating_service = ProductRatingService()
+        
+        result = rating_service.get_user_ratings(user_id, page, per_page)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== RUTAS ADMIN PARA CALIFICACIONES ====================
+
+@api_bp.route('/admin/product-ratings/pending', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_pending_ratings():
+    """
+    Obtener calificaciones pendientes de aprobación
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        rating_service = ProductRatingService()
+        result = rating_service.get_pending_ratings(page, per_page)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/admin/product-ratings/<rating_id>/approve', methods=['PATCH', 'OPTIONS'])
+@admin_required
+def approve_rating(rating_id):
+    """
+    Aprobar una calificación
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        rating_service = ProductRatingService()
+        result = rating_service.approve_rating(rating_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/admin/product-ratings/<rating_id>/reject', methods=['PATCH', 'OPTIONS'])
+@admin_required
+def reject_rating(rating_id):
+    """
+    Rechazar una calificación
+    """
+    try:
+        if request.method == 'OPTIONS':
+            response = jsonify(message='OPTIONS request received')
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Headers", "*")
+            response.headers.add("Access-Control-Allow-Methods", "*")
+            return response, 200
+        
+        data = request.get_json()
+        if not data or 'reason' not in data:
+            return jsonify({'success': False, 'error': 'Razón de rechazo requerida'}), 400
+        
+        rating_service = ProductRatingService()
+        result = rating_service.reject_rating(rating_id, data['reason'])
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

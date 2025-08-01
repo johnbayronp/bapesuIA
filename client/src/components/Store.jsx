@@ -121,8 +121,8 @@ const Store = () => {
               originalPrice: product.original_price ? parseFloat(product.original_price) : null,
               discount: product.discount_percentage ? parseFloat(product.discount_percentage) : null,
               category: product.category,
-              rating: 4.5, // Rating fijo por ahora
-              reviews: Math.floor(Math.random() * 200) + 50, // Reviews aleatorias
+              rating: product.rating || 0, // Usar rating real de la base de datos
+              reviews: product.reviews || 0, // Usar reviews reales de la base de datos
               image: product.image_url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=300&fit=crop',
               inStock: product.stock > 0
             }));

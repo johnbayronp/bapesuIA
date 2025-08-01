@@ -8,7 +8,8 @@ import {
   PlusIcon,
   MagnifyingGlassIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { formatCurrencyWithSymbol } from '../../../utils/currencyFormatter';
 
@@ -160,6 +161,30 @@ const OrdersManagement = () => {
     } catch (err) {
       alert(`Error: ${err.message}`);
       console.error('Error updating order:', err);
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingOrder(null);
+    setEditForm({
+      status: '',
+      customer_name: '',
+      customer_email: '',
+      customer_phone: '',
+      shipping_address: '',
+      shipping_city: '',
+      shipping_state: '',
+      shipping_zip_code: '',
+      comments: '',
+      tracking_number: '',
+      tracking_url: ''
+    });
+  };
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      handleCloseEditModal();
     }
   };
 
@@ -537,10 +562,21 @@ const OrdersManagement = () => {
 
       {/* Modal de edición */}
       {showEditModal && editingOrder && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+          onClick={handleBackdropClick}
+        >
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Editar Orden</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Editar Orden</h3>
+                <button
+                  onClick={handleCloseEditModal}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
               
               <div className="space-y-4">
                 <div>
@@ -664,7 +700,7 @@ const OrdersManagement = () => {
 
               <div className="flex justify-end space-x-3 mt-6">
                 <button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={handleCloseEditModal}
                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
                 >
                   Cancelar

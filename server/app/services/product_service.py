@@ -60,8 +60,11 @@ class ProductService:
             # Ejecutar consulta de datos
             result = query.execute()
             
+            # Obtener estadísticas de calificaciones para los productos
+            products_with_ratings = self._add_rating_stats_to_products(result.data or [])
+            
             return {
-                'data': result.data or [],
+                'data': products_with_ratings,
                 'total': total_count,
                 'page': page,
                 'per_page': per_page,
@@ -71,6 +74,91 @@ class ProductService:
         except Exception as e:
             logger.error(f"Error en get_products: {str(e)}")
             raise Exception(f"Error al obtener productos: {str(e)}")
+    
+    def _add_rating_stats_to_products(self, products: List[Dict]) -> List[Dict]:
+        """
+        Agregar estadísticas de calificaciones a una lista de productos
+        """
+        try:
+            print(f"=== DEBUG: _add_rating_stats_to_products ===")
+            print(f"Número de productos: {len(products)}")
+            
+            if not products:
+                print("No hay productos, retornando lista vacía")
+                return products
+            
+            # Obtener IDs de productos
+            product_ids = [product['id'] for product in products]
+            print(f"Product IDs extraídos: {product_ids}")
+            
+            # Obtener estadísticas de calificaciones para todos los productos
+            rating_stats = self._get_rating_stats_for_products(product_ids)
+            print(f"Rating stats obtenidos: {rating_stats}")
+            
+            # Agregar estadísticas a cada producto
+            for product in products:
+                product_id = product['id']
+                stats = rating_stats.get(product_id, {
+                    'average_rating': 0.0,
+                    'total_ratings': 0
+                })
+                
+                product['rating'] = round(stats['average_rating'], 1)
+                product['reviews'] = stats['total_ratings']
+                
+                print(f"Producto {product_id} ({product.get('name', 'N/A')}): rating={product['rating']}, reviews={product['reviews']}")
+            
+            return products
+            
+        except Exception as e:
+            print(f"ERROR en _add_rating_stats_to_products: {str(e)}")
+            logger.error(f"Error agregando estadísticas de calificaciones: {str(e)}")
+            # Si hay error, devolver productos sin estadísticas
+            for product in products:
+                product['rating'] = 0.0
+                product['reviews'] = 0
+            return products
+    
+    def _get_rating_stats_for_products(self, product_ids: List[int]) -> Dict[int, Dict]:
+        """
+        Obtener estadísticas de calificaciones para múltiples productos
+        """
+        try:
+            print(f"=== DEBUG: _get_rating_stats_for_products ===")
+            print(f"Product IDs recibidos: {product_ids}")
+            
+            if not product_ids:
+                print("No hay product_ids, retornando diccionario vacío")
+                return {}
+            
+            # Consulta para obtener estadísticas de calificaciones
+            print(f"Llamando a RPC get_products_rating_stats con: {product_ids}")
+            result = self.supabase.rpc('get_products_rating_stats', {
+                'product_ids': product_ids
+            }).execute()
+            
+            print(f"Resultado RPC: {result.data}")
+            
+            if result.data:
+                # Convertir a diccionario con product_id como clave
+                stats_dict = {}
+                for stat in result.data:
+                    print(f"Procesando stat: {stat}")
+                    stats_dict[stat['product_id']] = {
+                        'average_rating': float(stat['average_rating']) if stat['average_rating'] else 0.0,
+                        'total_ratings': int(stat['total_ratings']) if stat['total_ratings'] else 0
+                    }
+                
+                print(f"Stats dict final: {stats_dict}")
+                return stats_dict
+            else:
+                print("No hay datos en result.data, retornando diccionario vacío")
+                return {}
+                
+        except Exception as e:
+            print(f"ERROR en _get_rating_stats_for_products: {str(e)}")
+            logger.error(f"Error obteniendo estadísticas de calificaciones: {str(e)}")
+            return {}
     
     def _apply_filters(self, query, filters: Dict):
         """Aplicar filtros a una consulta"""
