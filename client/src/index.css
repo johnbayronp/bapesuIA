@@ -5,4 +5,14 @@
 
 body {
   font-family: 'Poppins', sans-serif;
+}
+
+/* Ocultar barra de scroll horizontal */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
 } 

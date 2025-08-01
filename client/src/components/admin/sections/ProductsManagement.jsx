@@ -40,6 +40,8 @@ const ProductsManagement = () => {
   const [categorySearchTerm, setCategorySearchTerm] = useState('');
   const [selectedCategoryStatus, setSelectedCategoryStatus] = useState('all');
   const [selectedProductStatus, setSelectedProductStatus] = useState('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
   
   const { showSuccess, showError } = useToast();
 
@@ -196,7 +198,10 @@ const ProductsManagement = () => {
   const handleCreateProduct = async (e) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
     try {
+      setIsSubmitting(true);
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products`, {
         method: 'POST',
@@ -221,13 +226,18 @@ const ProductsManagement = () => {
     } catch (error) {
       console.error('Error creating product:', error);
       showError('Error al crear producto');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     
+    if (isSubmitting) return;
+    
     try {
+      setIsSubmitting(true);
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${editingProduct.id}`, {
         method: 'PUT',
@@ -253,6 +263,8 @@ const ProductsManagement = () => {
     } catch (error) {
       console.error('Error updating product:', error);
       showError('Error al actualizar producto');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -293,6 +305,8 @@ const ProductsManagement = () => {
       description: product.description || '',
       category: product.category,
       price: product.price.toString(),
+      original_price: product.original_price ? product.original_price.toString() : '',
+      discount_percentage: product.discount_percentage ? product.discount_percentage.toString() : '',
       stock: product.stock.toString(),
       image_url: product.image_url || '',
       is_featured: product.is_featured || false,
@@ -321,6 +335,8 @@ const ProductsManagement = () => {
       description: '',
       category: '',
       price: '',
+      original_price: '',
+      discount_percentage: '',
       stock: '',
       image_url: '',
       is_featured: false,
@@ -344,7 +360,11 @@ const ProductsManagement = () => {
   // CRUD de categorías
   const handleCreateCategory = async (e) => {
     e.preventDefault();
+    
+    if (isSubmittingCategory) return;
+    
     try {
+      setIsSubmittingCategory(true);
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/categories`, {
         method: 'POST',
@@ -365,12 +385,18 @@ const ProductsManagement = () => {
       }
     } catch (error) {
       showError('Error al crear categoría');
+    } finally {
+      setIsSubmittingCategory(false);
     }
   };
 
   const handleUpdateCategory = async (e) => {
     e.preventDefault();
+    
+    if (isSubmittingCategory) return;
+    
     try {
+      setIsSubmittingCategory(true);
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/categories/${editingCategory.id}`, {
         method: 'PUT',
@@ -391,6 +417,8 @@ const ProductsManagement = () => {
       }
     } catch (error) {
       showError('Error al actualizar categoría');
+    } finally {
+      setIsSubmittingCategory(false);
     }
   };
 
@@ -634,6 +662,9 @@ const ProductsManagement = () => {
                         Precio
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Descuento
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Stock
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -669,6 +700,23 @@ const ProductsManagement = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           ${product.price}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                          {product.discount_percentage && product.discount_percentage > 0 ? (
+                            <div className="flex items-center">
+                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">
+                                <TagIcon className="h-3 w-3 mr-1" />
+                                {product.discount_percentage}%
+                              </span>
+                              {product.original_price && (
+                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 line-through">
+                                  ${product.original_price}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 text-xs">Sin descuento</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {product.stock}
@@ -967,6 +1015,36 @@ const ProductsManagement = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Precio Original
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.original_price}
+                    onChange={(e) => setFormData({...formData, original_price: e.target.value})}
+                    placeholder="Dejar vacío si no hay descuento"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Descuento (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.discount_percentage}
+                    onChange={(e) => setFormData({...formData, discount_percentage: e.target.value})}
+                    placeholder="Ej: 20 para 20% de descuento"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stock
                   </label>
                   <input
@@ -1017,6 +1095,34 @@ const ProductsManagement = () => {
                 />
               </div>
               
+              {/* Información sobre descuentos */}
+              {(formData.original_price || formData.discount_percentage) && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        Configuración de Descuento
+                      </h3>
+                      <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                        <p>• <strong>Precio Original:</strong> El precio antes del descuento</p>
+                        <p>• <strong>Descuento (%):</strong> El porcentaje de descuento aplicado</p>
+                        <p>• <strong>Precio Final:</strong> El precio que verán los clientes</p>
+                        {formData.original_price && formData.discount_percentage && (
+                          <p className="mt-2 font-semibold">
+                            Precio calculado: ${(parseFloat(formData.original_price) * (1 - parseFloat(formData.discount_percentage) / 100)).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -1040,9 +1146,25 @@ const ProductsManagement = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                  disabled={isSubmitting}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md flex items-center space-x-2 ${
+                    isSubmitting 
+                      ? 'bg-indigo-400 cursor-not-allowed' 
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
-                  {editingProduct ? 'Actualizar' : 'Crear'} Producto
+                  {isSubmitting && (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>
+                    {isSubmitting 
+                      ? (editingProduct ? 'Actualizando...' : 'Creando...') 
+                      : (editingProduct ? 'Actualizar' : 'Crear') + ' Producto'
+                    }
+                  </span>
                 </button>
               </div>
             </form>
@@ -1087,7 +1209,28 @@ const ProductsManagement = () => {
               </div>
               <div className="flex justify-end space-x-3 pt-4">
                 <button type="button" onClick={() => { setShowCategoriesModal(false); loadCategories(); }} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700">{editingCategory ? 'Actualizar' : 'Crear'} Categoría</button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingCategory}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md flex items-center space-x-2 ${
+                    isSubmittingCategory 
+                      ? 'bg-indigo-400 cursor-not-allowed' 
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
+                >
+                  {isSubmittingCategory && (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>
+                    {isSubmittingCategory 
+                      ? (editingCategory ? 'Actualizando...' : 'Creando...') 
+                      : (editingCategory ? 'Actualizar' : 'Crear') + ' Categoría'
+                    }
+                  </span>
+                </button>
               </div>
             </form>
           </div>

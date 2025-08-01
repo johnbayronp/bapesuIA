@@ -206,6 +206,7 @@ const Header = () => {
               </Link>
             )}
             
+            {/* Usuario autenticado */}
             {user ? (
               <>
                 {/* Versión móvil */}
@@ -275,12 +276,31 @@ const Header = () => {
                 </div>
               </>
             ) : (
-              <button
-                onClick={() => navigate('/login')}
-                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900"
-              >
-                Iniciar sesión
-              </button>
+              /* Usuario no autenticado */
+              <>
+                {/* Versión móvil */}
+                <div className="md:hidden border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
+                  <button
+                    onClick={() => {
+                      navigate('/login');
+                      setIsMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900"
+                  >
+                    Iniciar sesión
+                  </button>
+                </div>
+
+                {/* Versión escritorio */}
+                <div className="hidden md:block">
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="px-4 py-2 rounded-md text-base font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors duration-200"
+                  >
+                    Iniciar sesión
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

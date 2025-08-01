@@ -56,52 +56,52 @@ const ProductCard = ({
         <img
           src={product.image}
           alt={product.name}
-          className="w-full h-48 object-cover"
+          className="w-full h-40 md:h-48 object-cover"
         />
-        {/* Etiqueta de descuento */}
-        {showDiscount && product.discount && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-bold">
-            -{product.discount}%
-          </div>
-        )}
+                 {/* Etiqueta de descuento */}
+         {showDiscount && product.discount && product.discount > 0 && (
+           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs md:text-sm font-bold">
+             -{product.discount}%
+           </div>
+         )}
       </div>
 
       {/* Contenido del producto */}
-      <div className="p-4">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-          {product.name}
+      <div className="p-3 md:p-4">
+        <h3 className="text-base md:text-lg font-bold text-gray-900 dark:text-white mb-2">
+          {truncateText(product.name, 30)}
         </h3>
-        <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">
-          {truncateText(product.description, maxDescriptionLength)}
+        <p className="text-gray-600 dark:text-gray-300 text-xs md:text-sm mb-2 md:mb-3">
+          {truncateText(product.description, 60)}
         </p>
 
         {/* Calificación */}
-        <div className="flex items-center mb-3">
+        <div className="flex items-center mb-2 md:mb-3">
           <div className="flex items-center">
             {renderStars(product.rating)}
           </div>
-          <span className="text-gray-500 dark:text-gray-400 text-sm ml-2">
+          <span className="text-gray-500 dark:text-gray-400 text-xs md:text-sm ml-2">
             ({product.reviews})
           </span>
         </div>
 
-        {/* Precios */}
-        <div className="flex items-center mb-4">
-          <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-            {formatCurrencyWithSymbol(product.price)}
-          </span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-gray-400 line-through ml-2">
-              {formatCurrencyWithSymbol(product.originalPrice)}
-            </span>
-          )}
-        </div>
+                 {/* Precios */}
+         <div className="flex items-center mb-3 md:mb-4">
+           <span className="text-lg md:text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+             {formatCurrencyWithSymbol(product.price)}
+           </span>
+           {product.originalPrice && product.discount && product.discount > 0 && product.originalPrice > product.price && (
+             <span className="text-gray-400 line-through ml-2 text-sm md:text-base">
+               {formatCurrencyWithSymbol(product.originalPrice)}
+             </span>
+           )}
+         </div>
 
         {/* Botones de acción */}
         <div className="flex space-x-2">
           <button
             onClick={() => onAddToCart(product)}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-300"
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 md:px-4 rounded-lg transition-colors duration-300 text-xs md:text-sm"
           >
             Agregar al Carrito
           </button>
@@ -113,7 +113,7 @@ const ProductCard = ({
                 : 'bg-pink-500 hover:bg-pink-600 text-white'
             }`}
           >
-            <HeartIcon className={`h-5 w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
+            <HeartIcon className={`h-4 w-4 md:h-5 md:w-5 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
           </button>
         </div>
       </div>

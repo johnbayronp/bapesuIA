@@ -99,20 +99,20 @@ const Store = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          // Transformar los productos para que tengan el formato esperado
-          const transformedProducts = data.data.data.map(product => ({
-            id: product.id,
-            name: product.name,
-            description: product.description || 'Sin descripción',
-            price: parseFloat(product.price),
-            originalPrice: parseFloat(product.price) * 1.25, // Simular precio original
-            discount: 20, // Descuento fijo del 20%
-            category: product.category,
-            rating: 4.5, // Rating fijo por ahora
-            reviews: Math.floor(Math.random() * 200) + 50, // Reviews aleatorias
-            image: product.image_url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=300&fit=crop',
-            inStock: product.stock > 0
-          }));
+                                 // Transformar los productos para que tengan el formato esperado
+            const transformedProducts = data.data.data.map(product => ({
+              id: product.id,
+              name: product.name,
+              description: product.description || 'Sin descripción',
+              price: parseFloat(product.price),
+              originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+              discount: product.discount_percentage ? parseFloat(product.discount_percentage) : null,
+              category: product.category,
+              rating: 4.5, // Rating fijo por ahora
+              reviews: Math.floor(Math.random() * 200) + 50, // Reviews aleatorias
+              image: product.image_url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=300&fit=crop',
+              inStock: product.stock > 0
+            }));
           setProducts(transformedProducts);
         }
       } else {
@@ -222,35 +222,38 @@ const Store = () => {
       )}
 
       {/* Header de la tienda */}
-      <div className="text-center py-12 px-4">
-        <div className="flex items-center justify-center mb-4">
-          <ShoppingBagIcon className="h-12 w-12 text-indigo-600 dark:text-indigo-400 mr-4" />
-          <h1 className="text-5xl font-bold text-gray-900 dark:text-white">
+      <div className="text-center  md:py-2 px-4">
+        <div className="flex items-center justify-center ">
+          <ShoppingBagIcon className="h-8 w-8 md:h-12 md:w-12 text-indigo-600 dark:text-indigo-400 mr-3 md:mr-4" />
+          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 dark:text-white">
             Nuestra Tienda
           </h1>
         </div>
-        <p className="text-xl text-gray-600 dark:text-gray-300">
-          Descubre productos increíbles a precios increíbles
+        <p className="text-lg py-0 mb-4 md:text-xl text-gray-600 dark:text-gray-300">
+          Productos impresos en 3D
         </p>
       </div>
 
       {/* Filtros de categorías */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-        <div className="flex flex-wrap justify-center gap-4 mb-6">
-          {categories.map((category) => (
-                         <button
-               key={category.name}
-               onClick={() => setSelectedCategory(category.name)}
-               className={`flex items-center space-x-2 px-6 py-3 rounded-full transition-all duration-300 ${
-                 selectedCategory === category.name
-                   ? 'bg-indigo-600 text-white shadow-lg'
-                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-               }`}
-             >
-              <span className="text-lg">{category.icon}</span>
-              <span className="font-medium">{category.name}</span>
-            </button>
-          ))}
+        {/* Contenedor con scroll horizontal para móvil */}
+        <div className="flex overflow-x-auto pb-4 mb-6 scrollbar-hide">
+          <div className="flex space-x-3 min-w-max">
+            {categories.map((category) => (
+              <button
+                key={category.name}
+                onClick={() => setSelectedCategory(category.name)}
+                                 className={`flex items-center space-x-2 px-4 md:px-6 py-2 md:py-3 rounded-full transition-all duration-300 whitespace-nowrap ${
+                   selectedCategory === category.name
+                     ? 'bg-indigo-600 text-white shadow-lg'
+                     : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                 }`}
+              >
+                <span className="text-base md:text-lg">{category.icon}</span>
+                <span className="font-medium text-sm md:text-base">{category.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Barra de búsqueda */}
@@ -266,39 +269,69 @@ const Store = () => {
              />
           </div>
         </div>
+
+        {/* Agregar title of categorie - alinear a la izquierda*/}
+        <div className="text-left py-4 md:py-2 px-2 ">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {selectedCategory}
+          </h2>
+        </div>
       </div>
 
       {/* Grid de productos */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-                 {loading ? (
-           <div className="text-center py-12">
-             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-             <p className="text-gray-600 dark:text-gray-300 mt-4">Cargando productos...</p>
-           </div>
-         ) : (
-                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {getFilteredProducts().map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={handleAddToCart}
-                onAddToWishlist={addToWishlist}
-                isInWishlist={isInWishlist}
-                showDiscount={true}
-              />
-            ))}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="text-gray-600 dark:text-gray-300 mt-4">Cargando productos...</p>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Scroll horizontal solo en móvil, grid en desktop */}
+            <div className="md:hidden">
+              {/* Contenedor con scroll horizontal para móvil */}
+              <div className="flex overflow-x-auto pb-4 scrollbar-hide">
+                <div className="flex space-x-4 min-w-max">
+                  {getFilteredProducts().map((product) => (
+                    <div key={product.id} className="w-64 flex-shrink-0">
+                      <ProductCard
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        onAddToWishlist={addToWishlist}
+                        isInWishlist={isInWishlist}
+                        showDiscount={true}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-                                   {/* Mensaje cuando no hay productos */}
-          {!loading && getFilteredProducts().length === 0 && (
-           <div className="text-center py-12">
-             <p className="text-gray-600 dark:text-gray-300 text-lg">
-               No se encontraron productos que coincidan con tu búsqueda.
-             </p>
-           </div>
-                  )}
-               </div>
+            {/* Grid normal para desktop */}
+            <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {getFilteredProducts().map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                  onAddToWishlist={addToWishlist}
+                  isInWishlist={isInWishlist}
+                  showDiscount={true}
+                />
+              ))}
+            </div>
+
+            {/* Mensaje cuando no hay productos */}
+            {getFilteredProducts().length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-600 dark:text-gray-300 text-lg">
+                  No se encontraron productos que coincidan con tu búsqueda.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
         
                           {/* Cart Floating Button */}
          <CartFloatingButton />

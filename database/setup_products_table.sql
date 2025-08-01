@@ -14,6 +14,7 @@ CREATE TABLE public.products (
     description TEXT,
     category VARCHAR(100) NOT NULL,
     price DECIMAL(10,2) NOT NULL,
+    original_price DECIMAL(10,2),
     stock INTEGER DEFAULT 0,
     status VARCHAR(20) DEFAULT 'Activo',
     image_url TEXT,
@@ -41,6 +42,7 @@ CREATE INDEX idx_products_status ON public.products(status);
 CREATE INDEX idx_products_is_active ON public.products(is_active);
 CREATE INDEX idx_products_created_at ON public.products(created_at);
 CREATE INDEX idx_products_price ON public.products(price);
+CREATE INDEX idx_products_original_price ON public.products(original_price);
 CREATE INDEX idx_products_stock ON public.products(stock);
 CREATE INDEX idx_products_sku ON public.products(sku);
 CREATE INDEX idx_products_name ON public.products(name);
@@ -57,6 +59,9 @@ ADD CONSTRAINT products_stock_check CHECK (stock >= 0);
 
 ALTER TABLE public.products 
 ADD CONSTRAINT products_discount_check CHECK (discount_percentage >= 0 AND discount_percentage <= 100);
+
+ALTER TABLE public.products 
+ADD CONSTRAINT products_original_price_check CHECK (original_price >= 0);
 
 -- 6. Crear función para actualizar updated_at automáticamente
 CREATE OR REPLACE FUNCTION update_products_updated_at()
@@ -130,10 +135,33 @@ CREATE TRIGGER update_product_status_trigger
     FOR EACH ROW
     EXECUTE FUNCTION update_product_status();
 
--- 12. Configurar RLS (Row Level Security)
+-- 12. Crear función para calcular automáticamente el descuento basado en precio original y precio actual
+CREATE OR REPLACE FUNCTION calculate_discount_percentage()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Si hay precio original y precio actual, calcular el descuento
+    IF NEW.original_price IS NOT NULL AND NEW.price IS NOT NULL AND NEW.original_price > NEW.price THEN
+        NEW.discount_percentage := ((NEW.original_price - NEW.price) / NEW.original_price) * 100;
+    ELSIF NEW.original_price IS NULL OR NEW.original_price <= NEW.price THEN
+        -- Si no hay descuento, limpiar el precio original y el descuento
+        NEW.original_price := NULL;
+        NEW.discount_percentage := 0;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 13. Crear trigger para calcular automáticamente el descuento
+CREATE TRIGGER calculate_discount_trigger
+    BEFORE INSERT OR UPDATE ON public.products
+    FOR EACH ROW
+    EXECUTE FUNCTION calculate_discount_percentage();
+
+-- 14. Configurar RLS (Row Level Security)
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
--- 13. Crear políticas RLS
+-- 15. Crear políticas RLS
 -- Política para permitir lectura a todos los usuarios autenticados
 CREATE POLICY "Users can view active products" ON public.products
     FOR SELECT USING (is_active = true);
@@ -178,7 +206,7 @@ CREATE POLICY "Admins can delete products" ON public.products
         )
     );
 
--- 14. Crear usuario admin si no existe
+-- 16. Crear usuario admin si no existe
 INSERT INTO public.users (
     id, email, first_name, last_name, role, is_active
 ) VALUES (
@@ -190,7 +218,7 @@ INSERT INTO public.users (
     true
 ) ON CONFLICT (id) DO NOTHING;
 
--- 15. Insertar datos de ejemplo
+-- 17. Insertar datos de ejemplo
 INSERT INTO public.products (
     id, name, description, category, price, stock, status, 
     image_url, sku, is_featured, created_by
@@ -201,7 +229,7 @@ INSERT INTO public.products (
 (1004, 'Smartphone Galaxy', 'Teléfono inteligente con cámara avanzada', 'Electrónicos', 699.99, 0, 'Sin Stock', 'https://via.placeholder.com/300x200', 'ELE002', false, '550e8400-e29b-41d4-a716-446655440000'::uuid),
 (1005, 'Jeans Clásicos', 'Jeans de alta calidad', 'Ropa', 89.99, 25, 'Activo', 'https://via.placeholder.com/300x200', 'ROP002', false, '550e8400-e29b-41d4-a716-446655440000'::uuid);
 
--- 16. Crear vista para estadísticas de productos
+-- 18. Crear vista para estadísticas de productos
 CREATE OR REPLACE VIEW products_stats AS
 SELECT 
     COUNT(*) as total_products,

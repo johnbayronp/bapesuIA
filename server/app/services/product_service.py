@@ -169,6 +169,7 @@ class ProductService:
                 'description': product_data.get('description', ''),
                 'category': product_data['category'],
                 'price': float(product_data['price']),
+                'original_price': float(product_data.get('original_price', 0)) if product_data.get('original_price') else None,
                 'stock': int(product_data.get('stock', 0)),
                 'status': product_data.get('status', 'Activo'),
                 'image_url': product_data.get('image_url', ''),
@@ -256,7 +257,7 @@ class ProductService:
             
             # Solo actualizar campos que se proporcionen
             fields_to_update = [
-                'name', 'description', 'category', 'price', 'stock', 'status',
+                'name', 'description', 'category', 'price', 'original_price', 'stock', 'status',
                 'image_url', 'barcode', 'weight', 'dimensions', 'tags',
                 'specifications', 'is_featured', 'is_active', 'discount_percentage',
                 'cost_price', 'supplier_info', 'inventory_alerts', 'seo_data'
@@ -265,8 +266,8 @@ class ProductService:
             for field in fields_to_update:
                 if field in product_data and product_data[field] is not None:
                     try:
-                        if field in ['price', 'discount_percentage']:
-                            update_data[field] = float(product_data[field])
+                        if field in ['price', 'original_price', 'discount_percentage']:
+                            update_data[field] = float(product_data[field]) if product_data[field] else None
                         elif field == 'stock':
                             update_data[field] = int(product_data[field])
                         elif field == 'weight':
@@ -279,6 +280,9 @@ class ProductService:
                         raise ValueError(f"Error procesando campo '{field}': {str(e)}")
             
             print(f"Datos a actualizar: {update_data}")
+            print(f"Campos en update_data: {list(update_data.keys())}")
+            print(f"original_price en update_data: {update_data.get('original_price')}")
+            print(f"Tipo de original_price: {type(update_data.get('original_price'))}")
             
             # Actualizar producto
             print(f"Ejecutando actualización con ID: {product_id_int}, tipo: {type(product_id_int)}")
@@ -291,15 +295,20 @@ class ProductService:
             print(f"Longitud del resultado: {len(result.data) if result.data else 0}")
             
             if result.data and len(result.data) > 0:
-                return result.data[0]
+                updated_product = result.data[0]
+                print(f"Producto actualizado devuelto: {updated_product}")
+                print(f"original_price en producto actualizado: {updated_product.get('original_price')}")
+                return updated_product
             else:
                 # Intentar obtener el producto después de la actualización para verificar
                 check_result = self.supabase.table('products').select('*').eq('id', product_id_int).execute()
                 print(f"Verificación post-actualización: {check_result.data}")
                 
                 if check_result.data and len(check_result.data) > 0:
+                    checked_product = check_result.data[0]
                     print("Producto encontrado después de actualización, pero la actualización no devolvió datos")
-                    return check_result.data[0]
+                    print(f"original_price en producto verificado: {checked_product.get('original_price')}")
+                    return checked_product
                 else:
                     raise Exception("Error al actualizar el producto - producto no encontrado después de actualización")
                 
