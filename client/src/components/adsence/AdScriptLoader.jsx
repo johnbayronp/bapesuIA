@@ -1,5 +1,4 @@
 // src/components/adsence/AdScriptLoader.jsx
-
 import { useEffect } from "react";
 
 const AdScriptLoader = () => {
