@@ -31,8 +31,6 @@ SUPABASE_JWT_SECRET=
 
 
 
-
-
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
@@ -64,8 +62,8 @@ CREATE TABLE public.order_items (
   total_price numeric NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT order_items_pkey PRIMARY KEY (id),
-  CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT fk_order_items_order_id FOREIGN KEY (order_id) REFERENCES public.orders(id)
+  CONSTRAINT fk_order_items_order_id FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
 CREATE TABLE public.orders (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -94,6 +92,23 @@ CREATE TABLE public.orders (
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.product_ratings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  user_id uuid NOT NULL,
+  order_id uuid NOT NULL,
+  rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment text,
+  is_approved boolean DEFAULT true,
+  is_flagged boolean DEFAULT false,
+  flag_reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT product_ratings_pkey PRIMARY KEY (id),
+  CONSTRAINT product_ratings_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT product_ratings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT product_ratings_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
 CREATE TABLE public.products (
   id bigint NOT NULL,
   name character varying NOT NULL,
@@ -120,6 +135,9 @@ CREATE TABLE public.products (
   inventory_alerts jsonb DEFAULT '{}'::jsonb,
   seo_data jsonb DEFAULT '{}'::jsonb,
   original_price numeric CHECK (original_price >= 0::numeric),
+  average_rating numeric DEFAULT 0.00,
+  total_ratings integer DEFAULT 0,
+  rating_distribution jsonb DEFAULT '{"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}'::jsonb,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
 );
@@ -148,4 +166,13 @@ CREATE TABLE public.users (
   newsletter_subscription boolean DEFAULT false,
   marketing_consent boolean DEFAULT false,
   CONSTRAINT users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.wishlist (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  product_id bigint NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT wishlist_pkey PRIMARY KEY (id),
+  CONSTRAINT wishlist_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT wishlist_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
