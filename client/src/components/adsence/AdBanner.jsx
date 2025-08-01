@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
-const client = import.meta.env.VITE_ADSENSE_CLIENT;
-const slot = import.meta.env.VITE_ADSENSE_SLOT;
+const client = import.meta.env.VITE_ADSENSE_CLIENT; // ca-pub-4030387601467071
+const slot = import.meta.env.VITE_ADSENSE_SLOT;     // tu valor de slot aquí
 
 const AdBanner = () => {
   useEffect(() => {
