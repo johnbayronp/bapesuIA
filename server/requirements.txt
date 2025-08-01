@@ -12,3 +12,4 @@ flask-swagger-ui
 flask-restful
 google-genai
 qrcode[pil]==7.4.2
+google-cloud-texttospeech==2.27.0
