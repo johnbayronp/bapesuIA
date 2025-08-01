@@ -12,7 +12,8 @@ const ProductCard = ({
   onAddToWishlist, 
   isInWishlist,
   showDiscount = true,
-  maxDescriptionLength = 100
+  maxDescriptionLength = 100,
+  onImageClick
 }) => {
   const truncateText = (text, maxLength) => {
     if (!text || text.length <= maxLength) return text;
@@ -56,7 +57,8 @@ const ProductCard = ({
         <img
           src={product.image}
           alt={product.name}
-          className="w-full h-40 md:h-48 object-cover"
+          className="w-full h-40 md:h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity duration-300"
+          onClick={onImageClick}
         />
                  {/* Etiqueta de descuento */}
          {showDiscount && product.discount && product.discount > 0 && (

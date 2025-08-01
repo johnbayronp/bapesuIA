@@ -1089,10 +1089,22 @@ const ProductsManagement = () => {
                 </label>
                 <textarea
                   rows="3"
+                  maxLength="300"
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Describe el producto (máximo 200 caracteres)"
                 />
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {formData.description.length}/300 caracteres
+                  </span>
+                  {formData.description.length >= 300 && (
+                    <span className="text-xs text-red-500 dark:text-red-400">
+                      Límite alcanzado
+                    </span>
+                  )}
+                </div>
               </div>
               
               {/* Información sobre descuentos */}

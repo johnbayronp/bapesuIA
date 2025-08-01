@@ -8,6 +8,7 @@ import { useEcommerce } from '../context/EcommerceContext';
 import CartSidebar from './common/CartSidebar';
 import CartFloatingButton from './common/FloatingButtons';
 import ProductCard from './shared/ProductCard';
+import ProductModal from './shared/ProductModal';
 import LocationIndicator from './common/LocationIndicator';
 import { supabase } from '../lib/supabase';
 import useToast from '../hooks/useToast';
@@ -45,6 +46,8 @@ const Store = () => {
 
   const { showSuccess, showInfo } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Verificar autenticación al cargar
   useEffect(() => {
@@ -69,6 +72,16 @@ const Store = () => {
     // Si está autenticado, agregar normalmente
     addToCart(product);
     // No mostrar toast aquí porque addToCart ya lo hace
+  };
+
+  const handleImageClick = (product) => {
+    setSelectedProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
   };
 
 
@@ -229,8 +242,8 @@ const Store = () => {
             Nuestra Tienda
           </h1>
         </div>
-        <p className="text-lg py-0 mb-4 md:text-xl text-gray-600 dark:text-gray-300">
-          Productos impresos en 3D
+        <p className="text-lg py-2 mb-4 md:text-base text-gray-600 dark:text-gray-300">
+          Selecciona una categoría para ver nuestros productos
         </p>
       </div>
 
@@ -300,6 +313,7 @@ const Store = () => {
                         onAddToWishlist={addToWishlist}
                         isInWishlist={isInWishlist}
                         showDiscount={true}
+                        onImageClick={() => handleImageClick(product)}
                       />
                     </div>
                   ))}
@@ -317,6 +331,7 @@ const Store = () => {
                   onAddToWishlist={addToWishlist}
                   isInWishlist={isInWishlist}
                   showDiscount={true}
+                  onImageClick={() => handleImageClick(product)}
                 />
               ))}
             </div>
@@ -338,6 +353,16 @@ const Store = () => {
         
                  {/* Cart Sidebar */}
          <CartSidebar isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
+         
+         {/* Product Modal */}
+         <ProductModal
+           product={selectedProduct}
+           isOpen={isModalOpen}
+           onClose={handleCloseModal}
+           onAddToCart={handleAddToCart}
+           onAddToWishlist={addToWishlist}
+           isInWishlist={isInWishlist}
+         />
       </div>
     );
   };
