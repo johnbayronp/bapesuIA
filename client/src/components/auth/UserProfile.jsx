@@ -34,6 +34,41 @@ const UserProfile = () => {
     loadUserProfile();
   }, []);
 
+  // Función auxiliar para obtener estadísticas de órdenes
+  const getOrderStats = async () => {
+    const token = localStorage.getItem('access_token');
+    const statsResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/stats`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    let orderStats = {
+      total_spent: 0,
+      loyalty_points: 0,
+      order_history: []
+    };
+    
+    if (statsResponse.ok) {
+      const statsData = await statsResponse.json();
+      if (statsData.success) {
+        orderStats = statsData.data;
+      }
+    }
+    
+    return orderStats;
+  };
+
+  // Función auxiliar para combinar perfil con estadísticas
+  const combineProfileWithStats = (userProfile, orderStats) => {
+    return {
+      ...userProfile,
+      total_spent: orderStats.total_spent,
+      loyalty_points: orderStats.loyalty_points,
+      order_history: orderStats.order_history
+    };
+  };
+
   const loadUserProfile = async () => {
     try {
       setLoading(true);
@@ -59,34 +94,11 @@ const UserProfile = () => {
       // Obtener perfil del usuario
       const userProfile = await userService.getUserProfile(currentUser.id);
       
-      // Obtener estadísticas de órdenes desde el backend
-      const token = localStorage.getItem('access_token');
-      const statsResponse = await fetch(`${import.meta.env.VITE_API_URL}/user/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      let orderStats = {
-        total_spent: 0,
-        loyalty_points: 0,
-        order_history: []
-      };
-      
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        if (statsData.success) {
-          orderStats = statsData.data;
-        }
-      }
+      // Obtener estadísticas de órdenes
+      const orderStats = await getOrderStats();
       
       // Combinar perfil con estadísticas de órdenes
-      const profileWithStats = {
-        ...userProfile,
-        total_spent: orderStats.total_spent,
-        loyalty_points: orderStats.loyalty_points,
-        order_history: orderStats.order_history
-      };
+      const profileWithStats = combineProfileWithStats(userProfile, orderStats);
       
       setProfile(profileWithStats);
       
@@ -141,7 +153,13 @@ const UserProfile = () => {
       
       const updatedProfile = await userService.updateUserProfile(user.id, formData);
       
-      setProfile(updatedProfile);
+      // Obtener estadísticas de órdenes para mantenerlas
+      const orderStats = await getOrderStats();
+      
+      // Combinar perfil actualizado con estadísticas de órdenes
+      const profileWithStats = combineProfileWithStats(updatedProfile, orderStats);
+      
+      setProfile(profileWithStats);
       setIsEditing(false);
       setIsCompletingProfile(false);
       showSuccess('Perfil actualizado correctamente');
@@ -158,7 +176,13 @@ const UserProfile = () => {
       
       const updatedProfile = await userService.updateUserProfile(user.id, formData);
       
-      setProfile(updatedProfile);
+      // Obtener estadísticas de órdenes para mantenerlas
+      const orderStats = await getOrderStats();
+      
+      // Combinar perfil actualizado con estadísticas de órdenes
+      const profileWithStats = combineProfileWithStats(updatedProfile, orderStats);
+      
+      setProfile(profileWithStats);
       setIsCompletingProfile(false);
       showSuccess('¡Perfil completado exitosamente!');
     } catch (error) {
