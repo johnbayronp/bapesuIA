@@ -12,6 +12,7 @@ import ProductDescription from './components/tools/ProductDescription';
 import RemoveBackground from './components/tools/RemoveBackground';
 import VideoIdeas from './components/tools/VideoIdeas';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import PublicRoute from './components/auth/PublicRoute';
 import ThemeToggle from './components/themeUI/ThemeToggle';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
@@ -42,10 +43,38 @@ function App() {
               <Route path="/tienda" element={<Store />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/checkout-success" element={<CheckoutSuccess />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/change-password" element={<ResetPassword />} />
+              <Route 
+                path="/login" 
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/forgot-password" 
+                element={
+                  <PublicRoute>
+                    <ForgotPassword />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/reset-password" 
+                element={
+                  <PublicRoute>
+                    <ResetPassword />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/change-password" 
+                element={
+                  <PublicRoute>
+                    <ResetPassword />
+                  </PublicRoute>
+                } 
+              />
               <Route path="/tools" element={<ToolsPage />} />
               <Route 
                 path="/profile" 

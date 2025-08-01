@@ -10,6 +10,7 @@ from .services.product_service import ProductService
 from .services.category_service import CategoryService
 from .services.order_service import OrderService
 from .services.product_rating_service import ProductRatingService
+from .services.analytics_service import AnalyticsService
 from .middleware.auth import token_required, admin_required
 import qrcode
 from datetime import datetime
@@ -1917,3 +1918,433 @@ def reject_rating(rating_id):
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== ENDPOINTS DEL PANEL DE ADMINISTRACIÓN ====================
+
+@api_bp.route('/admin/dashboard/stats', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_dashboard_stats():
+    """Obtener estadísticas generales del dashboard con persistencia"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        # Obtener métricas del dashboard con persistencia
+        metrics_result = analytics_service.get_dashboard_metrics(days=30)
+        
+        if metrics_result['success']:
+            data = metrics_result['data']
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'total_orders': data.get('total_orders', 0),
+                    'total_products': data.get('total_products', 0),
+                    'total_users': data.get('total_users', 0),
+                    'monthly_revenue': float(data.get('monthly_revenue', 0)),
+                    'orders_change': data.get('orders_change', '+0%'),
+                    'products_change': data.get('products_change', '+0%'),
+                    'users_change': data.get('users_change', '+0%'),
+                    'revenue_change': data.get('revenue_change', '+0%'),
+                    'low_stock_products': data.get('low_stock_products', 0),
+                    'pending_orders': data.get('pending_orders', 0)
+                }
+            }), 200
+        else:
+            return jsonify(metrics_result), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/dashboard/alerts', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_dashboard_alerts():
+    """Obtener alertas del sistema con persistencia"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        # Obtener alertas activas del sistema
+        active_alerts = analytics_service.get_active_alerts()
+        
+        # Formatear alertas para el frontend
+        formatted_alerts = []
+        for alert in active_alerts:
+            formatted_alerts.append({
+                'type': alert.get('severity', 'info'),
+                'message': alert.get('message', ''),
+                'time': 'Reciente'  # En el futuro se puede calcular el tiempo relativo
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': formatted_alerts
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/stats', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_analytics_stats():
+    """Obtener estadísticas de analíticas con persistencia"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        # Obtener métricas de analíticas con persistencia
+        metrics_result = analytics_service.get_analytics_metrics(days=30)
+        
+        if metrics_result['success']:
+            data = metrics_result['data']
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'total_sales': float(data.get('total_sales', 0)),
+                    'total_orders': data.get('total_orders', 0),
+                    'total_users': data.get('total_users', 0),
+                    'conversion_rate': float(data.get('conversion_rate', 0)),
+                    'sales_change': data.get('sales_change', '+0%'),
+                    'orders_change': data.get('orders_change', '+0%'),
+                    'users_change': data.get('users_change', '+0%'),
+                    'conversion_change': data.get('conversion_change', '+0%')
+                }
+            }), 200
+        else:
+            return jsonify(metrics_result), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/top-products', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_top_products():
+    """Obtener productos más vendidos con persistencia"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        # Obtener productos más vendidos con persistencia
+        top_products = analytics_service.get_top_products_daily(limit=10)
+        
+        # Formatear datos para el frontend
+        formatted_products = []
+        for product in top_products:
+            formatted_products.append({
+                'name': product.get('product_name', ''),
+                'sales': product.get('total_sales', 0),
+                'revenue': f"${product.get('total_revenue', 0):.2f}"
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': formatted_products
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/recent-activity', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_recent_activity():
+    """Obtener actividad reciente del sistema con persistencia"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        # Obtener actividad reciente con persistencia
+        activities = analytics_service.get_recent_activity(limit=10)
+        
+        # Formatear datos para el frontend
+        formatted_activities = []
+        for activity in activities:
+            formatted_activities.append({
+                'action': activity.get('entity_name', activity.get('activity_type', 'Actividad')),
+                'user_name': activity.get('user_name', 'Sistema'),
+                'created_at': activity.get('created_at')
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': formatted_activities
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ==================== ENDPOINTS ADICIONALES PARA PERSISTENCIA ====================
+
+@api_bp.route('/admin/analytics/calculate-metrics', methods=['POST', 'OPTIONS'])
+@admin_required
+def calculate_metrics():
+    """Calcular y almacenar métricas diarias"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        # Calcular métricas para hoy
+        success = analytics_service.calculate_daily_metrics()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Métricas calculadas y almacenadas exitosamente'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al calcular métricas'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/log-activity', methods=['POST', 'OPTIONS'])
+@admin_required
+def log_activity():
+    """Registrar actividad del sistema"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        if not data or 'activity_type' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'activity_type es requerido'
+            }), 400
+        
+        analytics_service = AnalyticsService()
+        
+        success = analytics_service.log_system_activity(
+            activity_type=data['activity_type'],
+            entity_id=data.get('entity_id'),
+            entity_name=data.get('entity_name'),
+            user_id=data.get('user_id'),
+            user_name=data.get('user_name'),
+            metadata=data.get('metadata')
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Actividad registrada exitosamente'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al registrar actividad'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/create-alert', methods=['POST', 'OPTIONS'])
+@admin_required
+def create_alert():
+    """Crear una alerta del sistema"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        if not data or 'alert_type' not in data or 'message' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'alert_type y message son requeridos'
+            }), 400
+        
+        analytics_service = AnalyticsService()
+        
+        alert_id = analytics_service.create_system_alert(
+            alert_type=data['alert_type'],
+            message=data['message'],
+            severity=data.get('severity', 'info'),
+            metadata=data.get('metadata')
+        )
+        
+        if alert_id:
+            return jsonify({
+                'success': True,
+                'message': 'Alerta creada exitosamente',
+                'alert_id': alert_id
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al crear alerta'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/resolve-alert/<int:alert_id>', methods=['PATCH', 'OPTIONS'])
+@admin_required
+def resolve_alert(alert_id):
+    """Resolver una alerta del sistema"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        data = request.get_json() or {}
+        
+        analytics_service = AnalyticsService()
+        
+        success = analytics_service.resolve_system_alert(
+            alert_id=alert_id,
+            resolved_by=data.get('resolved_by')
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Alerta resuelta exitosamente'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al resolver alerta'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/weekly-report', methods=['GET', 'OPTIONS'])
+@admin_required
+def get_weekly_report():
+    """Obtener reporte semanal de métricas"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        analytics_service = AnalyticsService()
+        
+        report = analytics_service.generate_weekly_report()
+        
+        return jsonify(report), 200 if report['success'] else 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/admin/analytics/refresh-metrics', methods=['POST', 'OPTIONS'])
+@admin_required
+def refresh_metrics():
+    """Ejecutar el script de métricas diarias manualmente"""
+    if request.method == 'OPTIONS':
+        response = jsonify(message='OPTIONS request received')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response, 200
+
+    try:
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        # Obtener la ruta del script
+        script_path = Path(__file__).parent.parent / 'scripts' / 'daily_metrics_calculator.py'
+        
+        if not script_path.exists():
+            return jsonify({
+                'success': False,
+                'error': 'Script de métricas no encontrado'
+            }), 404
+
+        # Ejecutar el script
+        result = subprocess.run([
+            sys.executable, str(script_path)
+        ], capture_output=True, text=True, cwd=str(script_path.parent))
+
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'Métricas actualizadas exitosamente',
+                'output': result.stdout
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Error al ejecutar el script',
+                'output': result.stderr
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

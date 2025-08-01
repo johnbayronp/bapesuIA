@@ -291,31 +291,54 @@ class UserService:
         Obtener estadísticas de usuarios
         
         Returns:
-            Dict con estadísticas
+            Dict con las estadísticas de usuarios
         """
         try:
-            # Total usuarios
-            total_result = self.supabase.table('users').select('*', count='exact').execute()
-            total_users = total_result.count
+            # Obtener total de usuarios
+            total_result = self.supabase.table('users').select('id', count='exact').execute()
+            total_users = total_result.count if total_result.count else 0
             
-            # Usuarios activos
-            active_result = self.supabase.table('users').select('*', count='exact').eq('is_active', True).execute()
-            active_users = active_result.count
+            # Obtener usuarios activos
+            active_result = self.supabase.table('users').select('id', count='exact').eq('is_active', True).execute()
+            active_users = active_result.count if active_result.count else 0
             
-            # Usuarios por rol
-            roles_result = self.supabase.table('users').select('role').execute()
+            # Obtener usuarios por rol
+            role_result = self.supabase.table('users').select('role').execute()
             role_counts = {}
-            for user in roles_result.data:
-                role = user.get('role', 'unknown')
-                role_counts[role] = role_counts.get(role, 0) + 1
+            if role_result.data:
+                for user in role_result.data:
+                    role = user.get('role', 'user')
+                    role_counts[role] = role_counts.get(role, 0) + 1
             
             return {
-                'total_users': total_users,
-                'active_users': active_users,
-                'inactive_users': total_users - active_users,
-                'role_distribution': role_counts
+                'success': True,
+                'data': {
+                    'total_users': total_users,
+                    'active_users': active_users,
+                    'inactive_users': total_users - active_users,
+                    'role_counts': role_counts
+                }
             }
-            
         except Exception as e:
-            logger.error(f"Error getting user stats: {str(e)}")
-            raise Exception(f"Error al obtener estadísticas: {str(e)}") 
+            logger.error(f"Error en get_user_stats: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def get_recent_users(self, limit: int = 5) -> List[Dict]:
+        """
+        Obtener usuarios recientes
+        
+        Args:
+            limit: Número máximo de usuarios a retornar
+            
+        Returns:
+            Lista de usuarios recientes
+        """
+        try:
+            result = self.supabase.table('users').select('*').order('created_at', desc=True).limit(limit).execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logger.error(f"Error en get_recent_users: {str(e)}")
+            return [] 

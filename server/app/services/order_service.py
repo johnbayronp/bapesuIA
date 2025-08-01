@@ -378,3 +378,34 @@ class OrderService:
                 'error': str(e),
                 'message': 'Error al eliminar la orden'
             } 
+
+    def get_pending_orders(self) -> List[Dict[str, Any]]:
+        """
+        Obtener pedidos pendientes
+        
+        Returns:
+            Lista de pedidos pendientes
+        """
+        try:
+            result = self.supabase.table('orders').select('*').eq('status', 'pending').is_('deleted_at', 'null').execute()
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"Error getting pending orders: {e}")
+            return []
+
+    def get_recent_orders(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Obtener pedidos recientes
+        
+        Args:
+            limit: Número máximo de pedidos a retornar
+            
+        Returns:
+            Lista de pedidos recientes
+        """
+        try:
+            result = self.supabase.table('orders').select('*').is_('deleted_at', 'null').order('created_at', desc=True).limit(limit).execute()
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"Error getting recent orders: {e}")
+            return [] 
