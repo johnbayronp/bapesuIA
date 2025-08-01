@@ -12,6 +12,7 @@ class Config:
     # Configuración de Supabase
     SUPABASE_URL = os.getenv('SUPABASE_URL')
     SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+    SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')  # Clave de servicio para operaciones admin
     SUPABASE_JWT_SECRET = os.getenv('SUPABASE_JWT_SECRET')
 
     GEMINI_API_KEY= os.getenv('GEMINI_API_KEY')
@@ -51,6 +52,13 @@ class Config:
         """Validar la configuración requerida"""
         if not cls.DEEPSEEK_API_KEY:
             raise ValueError("DEEPSEEK_API_KEY no está configurada en las variables de entorno")
+        
+        # Validar configuración de Supabase para el servicio de usuarios
+        if not cls.SUPABASE_URL:
+            raise ValueError("SUPABASE_URL no está configurada en las variables de entorno")
+        
+        if not cls.SUPABASE_SERVICE_KEY:
+            raise ValueError("SUPABASE_SERVICE_KEY no está configurada en las variables de entorno")
 
 # Validar la configuración al importar el módulo
 Config.validate_config()

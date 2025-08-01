@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdBanner from './adsence/anuncios';
+import LocationIndicator from './common/LocationIndicator';
 
 const Home = () => {
   const navigate = useNavigate();

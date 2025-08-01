@@ -13,10 +13,11 @@ def create_app(config_class=Config):
     CORS(app, 
          resources={r"*": {  # Permitir todas las rutas
              "origins": ["*"],
-             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "Accept"],
+             "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
              "expose_headers": ["Content-Type", "Authorization"],
-             "supports_credentials": True
+             "supports_credentials": True,
+             "max_age": 86400  # Cache preflight por 24 horas
          }},
          supports_credentials=True)
     
@@ -34,5 +35,15 @@ def create_app(config_class=Config):
 
     # Registrar blueprints API
     app.register_blueprint(api_bp, url_prefix=app.config['API_PREFIX'])
+
+    # Manejador global para solicitudes OPTIONS
+    @app.route('/<path:path>', methods=['OPTIONS'])
+    def handle_options(path):
+        response = app.make_default_options_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+        response.headers.add('Access-Control-Max-Age', '86400')
+        return response
 
     return app
