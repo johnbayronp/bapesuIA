@@ -69,7 +69,8 @@ pip-delete-this-directory.txt
 
 # pyenv
 .python-version
-
+# Credenciales de Google (ignorar archivo JSON específico)
+app/credentials/text-to-speech.json
 # dotenv
 .env
 .venv

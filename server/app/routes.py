@@ -204,8 +204,6 @@ def text_to_speech():
         return response, 200
 
     try:
-        load_dotenv()
-
         data = request.json
 
         if 'text' not in data or not data['text'].strip():
