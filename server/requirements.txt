@@ -11,5 +11,4 @@ flask-swagger
 flask-swagger-ui
 flask-restful
 qrcode==7.4.2
-supabase==2.3.4
-flask-restful==0.3.10
+supabase==2.17.0
