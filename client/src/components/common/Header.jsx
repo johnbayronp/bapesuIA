@@ -162,9 +162,9 @@ const Header = () => {
             
             {/* Herramientas IA */}
             <Link 
-              to="/" 
+              to="/tools" 
               className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                location.pathname === '/' 
+                location.pathname === '/tools' 
                   ? 'bg-indigo-600 text-white shadow-lg' 
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}

@@ -212,12 +212,39 @@ def generate_ideas_videos():
         if field not in data:
             return jsonify({'error': f'Campo requerido faltante: {field}'}), 400
         
-    # Crear un servicio externo para agregar la logica 
-    #iaGemini = GeminiService()
-    
-    #response = iaGemini.generate_ideas_videos(data['prompt'])
+    prompt = f"""
+            Eres un filmmaker profesional y eres el mejor creativo del mundo, orientado a emprendedores y creativos, creame un video corto de 1 minuto para la siguiente idea:
+            {data['prompt']}
+        """
 
-    return jsonify({'error': 'servicio actualmente pausado'}),200
+    # Configurar la llamada a la API de DeepSeek
+    headers = {
+            "Authorization": f"Bearer {Config.DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+    payload = {
+            "model": Config.DEEPSEEK_MODEL,
+            "messages": [
+                {"role": "system", "content": "Eres un experto en marketing y filmmaking."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": Config.DEEPSEEK_TEMPERATURE,
+            "max_tokens": Config.DEEPSEEK_MAX_TOKENS
+        }
+
+        # Realizar la llamada a la API
+    response = requests.post(Config.DEEPSEEK_API_URL, headers=headers, json=payload)
+    response.raise_for_status()
+        
+        # Extraer la descripción generada
+    generated_text = response.json()['choices'][0]['message']['content']
+        
+    return jsonify({
+            'description': generated_text,
+            'status': 'success'
+    })
+
 
 @api_bp.route('/tools/qr_generator', methods=['POST', 'OPTIONS'])
 @token_required
