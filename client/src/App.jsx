@@ -41,7 +41,7 @@ function App() {
             <Header />
             <main className="flex-grow container mx-auto px-4 py-8">
             <Routes>
-              <Route path="/" element={<ToolsPage />} />
+              <Route path="/" element={<Store />} />
               <Route path="/tienda" element={<Store />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/checkout-success" element={<CheckoutSuccess />} />
