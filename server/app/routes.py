@@ -4,7 +4,6 @@ from rembg import remove
 from PIL import Image
 import io
 from app.config import Config
-from .services.gemini_service import GeminiService
 from .services.user_service import UserService
 from .services.product_service import ProductService
 from .services.category_service import CategoryService
@@ -214,11 +213,11 @@ def generate_ideas_videos():
             return jsonify({'error': f'Campo requerido faltante: {field}'}), 400
         
     # Crear un servicio externo para agregar la logica 
-    iaGemini = GeminiService()
+    #iaGemini = GeminiService()
     
-    response = iaGemini.generate_ideas_videos(data['prompt'])
+    #response = iaGemini.generate_ideas_videos(data['prompt'])
 
-    return jsonify(response),200
+    return jsonify({'error': 'servicio actualmente pausado'}),200
 
 @api_bp.route('/tools/qr_generator', methods=['POST', 'OPTIONS'])
 @token_required
