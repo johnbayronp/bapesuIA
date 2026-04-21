@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import QRCode from 'qrcode';
 import useToast from '../../hooks/useToast';
-import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
-import api from '../../lib/axiosConfig';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function QrGenerator() {
   const { showSuccess, showError } = useToast();
   const [text, setText] = useState('');
   const [qrImageUrl, setQrImageUrl] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const canvasRef = useRef(null);
 
   const handleGenerate = async () => {
     if (!text.trim()) {
@@ -17,19 +18,13 @@ export default function QrGenerator() {
     }
 
     setIsGenerating(true);
-
     try {
-      const response = await api.post(
-        `/tools/qr_generator`,
-        { content: text },
-        {
-          responseType: 'blob', // <-- importante para recibir la imagen QR
-        }
-      );
-
-      const qrBlob = new Blob([response.data], { type: 'image/png' });
-      const imageUrl = URL.createObjectURL(qrBlob);
-      setQrImageUrl(imageUrl);
+      const url = await QRCode.toDataURL(text, {
+        width: 400,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+      setQrImageUrl(url);
       showSuccess('Código QR generado con éxito');
     } catch (error) {
       console.error('Error al generar el QR:', error);
@@ -40,14 +35,13 @@ export default function QrGenerator() {
   };
 
   const handleDownload = () => {
-    if (qrImageUrl) {
-      const link = document.createElement('a');
-      link.href = qrImageUrl;
-      link.download = 'codigo-qr.png';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    if (!qrImageUrl) return;
+    const link = document.createElement('a');
+    link.href = qrImageUrl;
+    link.download = 'codigo-qr.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -64,10 +58,14 @@ export default function QrGenerator() {
           <input
             type="text"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => { setText(e.target.value); setQrImageUrl(null); }}
+            onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
             placeholder="Ej: https://tusitio.com"
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Generado completamente en tu navegador, sin enviar datos a ningún servidor.
+          </p>
         </div>
 
         <div className="flex justify-center gap-4">

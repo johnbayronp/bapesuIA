@@ -28,6 +28,13 @@ import Store from './components/Store';
 import Checkout from './components/Checkout';
 import CheckoutSuccess from './components/CheckoutSuccess';
 import { EcommerceProvider } from './context/EcommerceContext';
+import StudioPage from './components/studio/StudioPage';
+import ScriptGenerator from './components/studio/ScriptGenerator';
+import VideoHook from './components/studio/VideoHook';
+import ViralTitles from './components/studio/ViralTitles';
+import YoutubeDescription from './components/studio/YoutubeDescription';
+import ColaboraPage from './components/ColaboraPage';
+import SponsorsBar from './components/common/SponsorsBar';
 
 function App() {
   useAuthRefresh();
@@ -37,14 +44,16 @@ function App() {
     <AdScriptLoader/>
       <EcommerceProvider>
         <Router>
-          <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors duration-300">
+          <div className="flex-1 flex flex-col bg-[#f7f8fc] dark:bg-[#07070f] transition-colors duration-300 bg-grid-light dark:bg-grid">
             <Header />
-            <main className="flex-grow container mx-auto px-4 py-8">
+            <main className="flex-1 w-full max-w-screen-xl mx-auto px-4 py-8">
             <Routes>
-              <Route path="/" element={<Store />} />
+              <Route path="/" element={<ToolsPage />} />
+              {/* Tienda temporalmente oculta
               <Route path="/tienda" element={<Store />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/checkout-success" element={<CheckoutSuccess />} />
+              */}
               <Route 
                 path="/login" 
                 element={
@@ -103,46 +112,21 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/tools/product-description" 
-                element={
-                  <ProtectedRoute>
-                    <ProductDescription />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/tools/remove-background" 
-                element={
-                  <ProtectedRoute>
-                    <RemoveBackground />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/tools/video-ideas" 
-                element={
-                  <ProtectedRoute>
-                    <VideoIdeas/>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/tools/whatsapp-link-generator" 
-                element={
-                  <ProtectedRoute>
-                    <WhatsappLinkGenerator />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/tools/qr-generator" 
-                element={
-                  <ProtectedRoute>
-                    <QrGenerator/>
-                  </ProtectedRoute>
-                } 
-              />
+              <Route path="/tools/product-description" element={<ProductDescription />} />
+              <Route path="/tools/remove-background" element={<RemoveBackground />} />
+              <Route path="/tools/video-ideas" element={<VideoIdeas />} />
+              <Route path="/tools/whatsapp-link-generator" element={<WhatsappLinkGenerator />} />
+              <Route path="/tools/qr-generator" element={<QrGenerator />} />
+
+              {/* Rutas de Studio */}
+              <Route path="/studio" element={<StudioPage />} />
+              <Route path="/studio/script" element={<ScriptGenerator />} />
+              <Route path="/studio/hook" element={<VideoHook />} />
+              <Route path="/studio/titles" element={<ViralTitles />} />
+              <Route path="/studio/description" element={<YoutubeDescription />} />
+
+              {/* Colaboración */}
+              <Route path="/colabora" element={<ColaboraPage />} />
               
                             {/* Rutas del Administrador */}
               <Route 
@@ -160,6 +144,7 @@ function App() {
             
                      </main>
            <ThemeToggle />
+           <SponsorsBar />
            <Footer />
           <ToastContainer 
             position="top-center"

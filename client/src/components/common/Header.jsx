@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import CartIcon from './CartIcon';
-import { useEcommerce } from '../../context/EcommerceContext';
 import logoLight from '../../assets/logo-light.png';
 import logoDark from '../../assets/logo-dark.png';
 
@@ -12,88 +10,58 @@ const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { getCartCount, setCartOpen } = useEcommerce();
   const userMenuRef = useRef(null);
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-      
-      // Verificar si es admin solo si hay usuario
-      if (user) {
-        checkAdminStatus(user.id);
-      }
+      if (user) checkAdminStatus(user.id);
     };
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        checkAdminStatus(session.user.id);
-      } else {
-        setIsAdmin(false);
-      }
+      if (session?.user) checkAdminStatus(session.user.id);
+      else setIsAdmin(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Detectar modo oscuro
   useEffect(() => {
-    const checkDarkMode = () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setIsDarkMode(isDark);
-    };
-
-    // Verificar inicialmente
+    const checkDarkMode = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
     checkDarkMode();
-
-    // Observar cambios en el tema
     const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
 
-  // Cerrar menú de usuario cuando se hace clic fuera
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
       }
     };
-
-    if (isUserMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    if (isUserMenuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isUserMenuOpen]);
 
   const checkAdminStatus = async (userId) => {
     try {
       const { data: profile, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (!error && profile?.role === 'admin') {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
-    } catch (err) {
-      console.error('Error checking admin status:', err);
+        .from('users').select('role').eq('id', userId).single();
+      setIsAdmin(!error && profile?.role === 'admin');
+    } catch {
       setIsAdmin(false);
     }
   };
@@ -101,7 +69,6 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      // Limpiar los tokens al cerrar sesión
       sessionStorage.removeItem('access_token');
       localStorage.removeItem('access_token');
       setUser(null);
@@ -112,192 +79,131 @@ const Header = () => {
     }
   };
 
+  const navLinkClass = (path) =>
+    `relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+      location.pathname === path || location.pathname.startsWith(path + '/')
+        ? 'bg-indigo-500/20 text-indigo-300 dark:text-indigo-300 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+        : 'text-gray-600 dark:text-gray-400 hover:text-indigo-400 dark:hover:text-indigo-300 hover:bg-white/5'
+    }`;
+
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-md transition-colors duration-300 relative z-40">
+    <header
+      className={`sticky top-0 z-40 transition-all duration-300 ${
+        scrolled
+          ? 'bg-white/80 dark:bg-[#07070f]/90 backdrop-blur-xl shadow-[0_1px_0_0_rgba(99,102,241,0.15)] dark:shadow-[0_1px_0_0_rgba(99,102,241,0.1)]'
+          : 'bg-white/60 dark:bg-[#07070f]/60 backdrop-blur-md'
+      }`}
+    >
+      {/* Gradient line at bottom */}
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 dark:via-indigo-500/30 to-transparent" />
+
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-        <Link to="/" className="flex items-center">
-          <img 
-            src={isDarkMode ? logoDark : logoLight} 
-            alt="BAPESU AI Tools" 
-            className="h-8 w-auto"
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2 group">
+          <img
+            src={isDarkMode ? logoDark : logoLight}
+            alt="BAPESU AI"
+            className="h-8 w-auto transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]"
           />
         </Link>
 
-        {/* Menú hamburguesa para móvil */}
+        {/* Mobile hamburger */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="md:hidden text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+          className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all duration-200"
         >
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            {isMenuOpen ? (
-              <path d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            )}
+          <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+            {isMenuOpen ? <path d="M6 18L18 6M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
           </svg>
         </button>
 
-        {/* Menú de navegación */}
-        <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block absolute md:relative top-16 md:top-0 left-0 w-full md:w-auto bg-white dark:bg-gray-800 shadow-lg md:shadow-none`}>
-          <div className="px-2 pt-2 pb-3 space-y-1 md:space-y-0 md:flex md:items-center md:space-x-4">
-            {/* Tienda - Primero */}
-            <Link 
-              to="/tienda" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                location.pathname === '/tienda' 
-                  ? 'bg-indigo-600 text-white shadow-lg' 
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
-              Tienda
-            </Link>
-            
-            {/* Herramientas IA */}
-            <Link 
-              to="/tools" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                location.pathname === '/tools' 
-                  ? 'bg-indigo-600 text-white shadow-lg' 
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
+        {/* Nav */}
+        <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block absolute md:relative top-16 md:top-0 left-0 w-full md:w-auto bg-white/95 dark:bg-[#0d0d1a]/95 backdrop-blur-xl md:backdrop-blur-none md:bg-transparent shadow-xl md:shadow-none border-b border-gray-100 dark:border-white/5 md:border-0`}>
+          <div className="px-4 py-3 md:py-0 space-y-1 md:space-y-0 md:flex md:items-center md:space-x-1">
+
+            <Link to="/tools" className={navLinkClass('/tools')} onClick={() => setIsMenuOpen(false)}>
               Herramientas IA
             </Link>
-            
-            {/* Botón del carrito */}
-            <button 
-              className="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 relative text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => {
-                if (location.pathname === '/tienda') {
-                  setCartOpen(true);
-                } else {
-                  navigate('/tienda');
-                }
-              }}
-            >
-              <CartIcon />
-              {getCartCount() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-                  {getCartCount() > 99 ? '99+' : getCartCount()}
-                </span>
-              )}
-            </button>
-            
-            {/* Administrador - solo si es admin */}
+
+            <Link to="/studio" className={navLinkClass('/studio')} onClick={() => setIsMenuOpen(false)}>
+              Studio
+            </Link>
+
+            <Link to="/colabora" className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              location.pathname === '/colabora'
+                ? 'bg-indigo-500/20 text-indigo-300 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                : 'border border-indigo-500/30 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/60 hover:shadow-[0_0_10px_rgba(99,102,241,0.2)]'
+            }`} onClick={() => setIsMenuOpen(false)}>
+              ☕ Colabora
+            </Link>
+
             {user && isAdmin && (
-              <Link 
-                to="/admin" 
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                  location.pathname === '/admin' 
-                    ? 'bg-indigo-600 text-white shadow-lg' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
+              <Link to="/admin" className={navLinkClass('/admin')} onClick={() => setIsMenuOpen(false)}>
                 Administrador
               </Link>
             )}
-            
-            {/* Usuario autenticado */}
+
+            {/* Auth section */}
             {user ? (
               <>
-                {/* Versión móvil */}
-                <div className="md:hidden border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
-                  <div className="flex items-center space-x-3 px-3 py-2">
-                    <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white text-lg">
+                {/* Mobile */}
+                <div className="md:hidden border-t border-gray-100 dark:border-white/5 mt-2 pt-2">
+                  <div className="flex items-center gap-3 px-2 py-2">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.4)]">
                       {user.email.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
-                      <div className="flex flex-col space-y-1 mt-1">
-                        <Link
-                          to="/profile"
-                          onClick={() => setIsMenuOpen(false)}
-                          className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-                        >
-                          Mi Perfil
-                        </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                        >
-                          Cerrar sesión
-                        </button>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                      <div className="flex gap-3 mt-1">
+                        <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600">Mi Perfil</Link>
+                        <button onClick={handleLogout} className="text-xs text-red-500 hover:text-red-600">Salir</button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Versión escritorio */}
+                {/* Desktop */}
                 <div className="hidden md:block relative" ref={userMenuRef}>
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="flex items-center space-x-2 focus:outline-none"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all duration-200 group"
                   >
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-[0_0_8px_rgba(99,102,241,0.35)]">
                       {user.email.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-gray-700 dark:text-gray-300">{user.email}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-indigo-400 transition-colors duration-200 max-w-[120px] truncate">{user.email}</span>
+                    <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
-                  
-                  {/* Menú desplegable del usuario */}
+
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-[60]">
-                      <div className="py-1" role="menu" aria-orientation="vertical">
-                        <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                          {user.email}
-                        </div>
-                        <Link
-                          to="/profile"
-                          onClick={() => setIsUserMenuOpen(false)}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                          role="menuitem"
-                        >
-                          Mi Perfil
-                        </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 cursor-pointer"
-                          role="menuitem"
-                        >
-                          Cerrar sesión
-                        </button>
-                      </div>
+                    <div className="absolute right-0 mt-2 w-52 rounded-xl shadow-2xl bg-white/95 dark:bg-[#0d0d1a]/95 backdrop-blur-xl border border-gray-100 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/5 z-[60] overflow-hidden">
+                      <div className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-white/5 truncate">{user.email}</div>
+                      <Link to="/profile" onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        Mi Perfil
+                      </Link>
+                      <button onClick={handleLogout}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Cerrar sesión
+                      </button>
                     </div>
                   )}
                 </div>
               </>
             ) : (
-              /* Usuario no autenticado */
               <>
-                {/* Versión móvil */}
-                <div className="md:hidden border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
-                  <button
-                    onClick={() => {
-                      navigate('/login');
-                      setIsMenuOpen(false);
-                    }}
-                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900"
-                  >
-                    Iniciar sesión
-                  </button>
+                {/* Mobile */}
+                <div className="md:hidden border-t border-gray-100 dark:border-white/5 mt-2 pt-2 px-2">
+                  {/* Botón de login temporalmente oculto */}
                 </div>
 
-                {/* Versión escritorio */}
+                {/* Desktop */}
                 <div className="hidden md:block">
-                  <button
-                    onClick={() => navigate('/login')}
-                    className="px-4 py-2 rounded-md text-base font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-colors duration-200"
-                  >
-                    Iniciar sesión
-                  </button>
+                  {/* Botón de login temporalmente oculto */}
                 </div>
               </>
             )}
@@ -308,4 +214,4 @@ const Header = () => {
   );
 };
 
-export default Header; 
+export default Header;

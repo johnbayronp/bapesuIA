@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite';
 import ViteReact from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [ViteReact()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     port: 3000,
     proxy: {

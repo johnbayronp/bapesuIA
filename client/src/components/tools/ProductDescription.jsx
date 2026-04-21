@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import useToast from '../../hooks/useToast';
-import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
-import api from '../../lib/axiosConfig';
+import 'react-toastify/dist/ReactToastify.css';
+
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
 
 export default function ProductDescription() {
   const { showSuccess, showError } = useToast();
@@ -12,23 +13,15 @@ export default function ProductDescription() {
     category: '',
     features: '',
     targetAudience: '',
-    tone: 'profesional'
+    tone: 'profesional',
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedDescription, setGeneratedDescription] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
-    // Limitar características a 350 caracteres
-    if (name === 'features' && value.length > 350) {
-      return;
-    }
-    
-    setProductInfo(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'features' && value.length > 350) return;
+    setProductInfo((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleCopy = () => {
@@ -39,19 +32,45 @@ export default function ProductDescription() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsGenerating(true);
-    
-    try {
-      // Obtener el token del localStorage
-      const token = localStorage.getItem('access_token');
-      
-      if (!token) {
-        showError('No hay sesión activa. Por favor, inicia sesión.');
-        return;
-      }
 
-      const response = await api.post(`/tools/generate-description`, productInfo);
-      
-      setGeneratedDescription(response.data.description);
+    const prompt = `Redacta una descripción profesional en español (60-100 palabras) para el siguiente producto o servicio:
+
+- Nombre: ${productInfo.name}
+- Categoría: ${productInfo.category}
+- Características: ${productInfo.features}
+- Público objetivo: ${productInfo.targetAudience}
+- Tono: ${productInfo.tone}
+
+Instrucciones:
+- Sé persuasivo y enfocado en ventas.
+- Adapta el texto al tono y público especificado.
+- Destaca las características principales con claridad.
+- Usa lenguaje profesional, evita repeticiones y frases genéricas.
+- La descripción debe estar completa y finalizar con un punto.
+- No incluyas explicaciones ni encabezados, solo la descripción.`;
+
+    try {
+      const response = await fetch(DEEPSEEK_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: 'Eres un experto en marketing y copywriting.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+      setGeneratedDescription(data.choices[0].message.content);
       showSuccess('Descripción generada con éxito');
     } catch (error) {
       console.error('Error al generar la descripción:', error);
@@ -61,13 +80,12 @@ export default function ProductDescription() {
     }
   };
 
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-bold mb-8 text-center text-gray-900 dark:text-white">
         Generador de Descripciones con IA
       </h1>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Formulario */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
@@ -89,9 +107,7 @@ export default function ProductDescription() {
             </div>
 
             <div>
-              <label className="block text-gray-700 dark:text-gray-300 mb-2">
-                Categoría
-              </label>
+              <label className="block text-gray-700 dark:text-gray-300 mb-2">Categoría</label>
               <input
                 type="text"
                 name="category"
@@ -125,9 +141,7 @@ export default function ProductDescription() {
             </div>
 
             <div>
-              <label className="block text-gray-700 dark:text-gray-300 mb-2">
-                Público Objetivo
-              </label>
+              <label className="block text-gray-700 dark:text-gray-300 mb-2">Público Objetivo</label>
               <input
                 type="text"
                 name="targetAudience"
@@ -170,7 +184,7 @@ export default function ProductDescription() {
           </form>
         </div>
 
-        {/* Descripción Generada */}
+        {/* Resultado */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -191,7 +205,7 @@ export default function ProductDescription() {
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 min-h-[400px]">
             {isGenerating ? (
               <div className="flex flex-col items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mb-4"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mb-4" />
                 <p className="text-gray-600 dark:text-gray-400">Generando descripción...</p>
               </div>
             ) : generatedDescription ? (
@@ -209,4 +223,4 @@ export default function ProductDescription() {
       <ToastContainer />
     </div>
   );
-} 
+}
