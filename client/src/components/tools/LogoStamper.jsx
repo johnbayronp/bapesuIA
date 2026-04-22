@@ -4,6 +4,8 @@ import useToast from '../../hooks/useToast';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+const MAX_IMAGES = 30;
+
 const POSITIONS = [
   { id: 'top-left',      label: '↖', row: 0, col: 0 },
   { id: 'top-center',    label: '↑', row: 0, col: 1 },
@@ -145,7 +147,12 @@ export default function LogoStamper() {
   const handleBgChange = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    const items = files.map((file) => ({
+    let selected = files;
+    if (selected.length > MAX_IMAGES) {
+      showError(`Máximo ${MAX_IMAGES} imágenes. Se tomaron las primeras ${MAX_IMAGES}.`);
+      selected = selected.slice(0, MAX_IMAGES);
+    }
+    const items = selected.map((file) => ({
       file,
       url: URL.createObjectURL(file),
       name: file.name,
@@ -158,7 +165,18 @@ export default function LogoStamper() {
   const handleAddMore = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    const newItems = files.map((file) => ({
+    const remaining = MAX_IMAGES - bgImages.length;
+    if (remaining <= 0) {
+      showError(`Ya alcanzaste el máximo de ${MAX_IMAGES} imágenes.`);
+      e.target.value = '';
+      return;
+    }
+    let selected = files;
+    if (selected.length > remaining) {
+      showError(`Solo se agregaron ${remaining} imágenes (máximo ${MAX_IMAGES}).`);
+      selected = selected.slice(0, remaining);
+    }
+    const newItems = selected.map((file) => ({
       file,
       url: URL.createObjectURL(file),
       name: file.name,
@@ -283,7 +301,7 @@ export default function LogoStamper() {
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               1 · Imagen(es) de fondo
               {bgImages.length > 0 && (
-                <span className="ml-2 text-xs font-normal text-indigo-500">{bgImages.length} seleccionada{bgImages.length > 1 ? 's' : ''}</span>
+                <span className="ml-2 text-xs font-normal text-indigo-500">{bgImages.length}/{MAX_IMAGES} seleccionada{bgImages.length > 1 ? 's' : ''}</span>
               )}
             </label>
             <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 dark:border-white/15 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/5 transition-all duration-200">
@@ -300,11 +318,12 @@ export default function LogoStamper() {
                 <input ref={addMoreInputRef} type="file" accept="image/*" multiple onChange={handleAddMore} className="hidden" />
                 <button
                   onClick={() => addMoreInputRef.current?.click()}
-                  className="w-full py-2 rounded-xl border border-dashed border-indigo-300 dark:border-indigo-500/40 text-indigo-500 dark:text-indigo-400 text-xs font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all duration-200 flex items-center justify-center gap-1.5">
+                  disabled={bgImages.length >= MAX_IMAGES}
+                  className="w-full py-2 rounded-xl border border-dashed border-indigo-300 dark:border-indigo-500/40 text-indigo-500 dark:text-indigo-400 text-xs font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all duration-200 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Agregar más fotos
+                  {bgImages.length >= MAX_IMAGES ? `Máximo alcanzado (${MAX_IMAGES})` : 'Agregar más fotos'}
                 </button>
               </div>
             )}
