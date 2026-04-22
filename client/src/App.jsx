@@ -18,6 +18,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { useAuthRefresh } from "./hooks/useAuthRefresh";
 import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
+import LogoStamper from './components/tools/LogoStamper';
 import AdScriptLoader from './components/adsence/AdScriptLoader';
 import UserProfile from './components/auth/UserProfile';
 import UserProfileDebug from './components/auth/UserProfileDebug';
@@ -117,6 +118,7 @@ function App() {
               <Route path="/tools/video-ideas" element={<VideoIdeas />} />
               <Route path="/tools/whatsapp-link-generator" element={<WhatsappLinkGenerator />} />
               <Route path="/tools/qr-generator" element={<QrGenerator />} />
+              <Route path="/tools/logo-stamper" element={<LogoStamper />} />
 
               {/* Rutas de Studio */}
               <Route path="/studio" element={<StudioPage />} />

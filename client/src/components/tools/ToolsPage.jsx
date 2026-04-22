@@ -94,6 +94,24 @@ const tools = [
       </svg>
     ),
   },
+  {
+    title: 'Agregar Logo',
+    description: 'Añade tu marca o watermark a una o varias imágenes. Elige posición, tamaño y opacidad con preview en vivo.',
+    to: '/tools/logo-stamper',
+    gradient: 'from-pink-500 to-rose-500',
+    glow: 'rgba(236,72,153,0.3)',
+    iconBg: 'bg-pink-500/10 dark:bg-pink-500/15',
+    iconColor: 'text-pink-500 dark:text-pink-400',
+    border: 'hover:border-pink-500/40',
+    badge: 'Gratis',
+    badgeColor: 'bg-pink-500/15 text-pink-400 border border-pink-500/25',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function ToolsPage() {
