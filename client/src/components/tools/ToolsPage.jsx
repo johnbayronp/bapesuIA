@@ -130,6 +130,24 @@ const tools = [
       </svg>
     ),
   },
+  {
+    title: 'Nómina Colombia 2026',
+    description: 'Calcula salario neto, aportes, prestaciones sociales y costo total empresa según la ley colombiana. Descarga la colilla en PDF.',
+    to: '/tools/payroll-calculator',
+    gradient: 'from-amber-500 to-orange-500',
+    glow: 'rgba(245,158,11,0.3)',
+    iconBg: 'bg-amber-500/10 dark:bg-amber-500/15',
+    iconColor: 'text-amber-500 dark:text-amber-400',
+    border: 'hover:border-amber-500/40',
+    badge: 'Nuevo',
+    badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/25',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M9 7h6m-6 4h6m-6 4h4M5 5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function ToolsPage() {
