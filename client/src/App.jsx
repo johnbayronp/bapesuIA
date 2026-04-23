@@ -19,6 +19,7 @@ import { useAuthRefresh } from "./hooks/useAuthRefresh";
 import WhatsappLinkGenerator from './components/tools/WhatsappLinkGenerator';
 import QrGenerator from './components/tools/QrGenerator';
 import LogoStamper from './components/tools/LogoStamper';
+import InvoiceGenerator from './components/tools/InvoiceGenerator';
 import AdScriptLoader from './components/adsence/AdScriptLoader';
 import UserProfile from './components/auth/UserProfile';
 import UserProfileDebug from './components/auth/UserProfileDebug';
@@ -119,6 +120,7 @@ function App() {
               <Route path="/tools/whatsapp-link-generator" element={<WhatsappLinkGenerator />} />
               <Route path="/tools/qr-generator" element={<QrGenerator />} />
               <Route path="/tools/logo-stamper" element={<LogoStamper />} />
+              <Route path="/tools/invoice-generator" element={<InvoiceGenerator />} />
 
               {/* Rutas de Studio */}
               <Route path="/studio" element={<StudioPage />} />

@@ -112,6 +112,24 @@ const tools = [
       </svg>
     ),
   },
+  {
+    title: 'Cuenta de Cobro',
+    description: 'Crea cuentas de cobro profesionales en PDF con datos del cliente, servicios, total automático y conversión a letras.',
+    to: '/tools/invoice-generator',
+    gradient: 'from-emerald-500 to-teal-500',
+    glow: 'rgba(16,185,129,0.3)',
+    iconBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
+    iconColor: 'text-emerald-500 dark:text-emerald-400',
+    border: 'hover:border-emerald-500/40',
+    badge: 'Nuevo',
+    badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M9 12h6m-6 4h6m-7 4h8a2 2 0 002-2V6a2 2 0 00-2-2h-8a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function ToolsPage() {
@@ -143,7 +161,7 @@ export default function ToolsPage() {
 
             {/* Stats row */}
             <div className="flex items-center justify-center gap-8 mt-8">
-              {[['5', 'Herramientas'], ['100%', 'Gratis'], ['IA', 'Integrada']].map(([val, label]) => (
+              {[[String(tools.length), 'Herramientas'], ['100%', 'Gratis'], ['IA', 'Integrada']].map(([val, label]) => (
                 <div key={label} className="text-center">
                   <div className="text-2xl font-bold gradient-text">{val}</div>
                   <div className="text-xs text-gray-400 dark:text-gray-600 mt-0.5">{label}</div>
