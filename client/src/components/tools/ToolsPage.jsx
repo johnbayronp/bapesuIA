@@ -80,6 +80,7 @@ const tools = [
     title: 'Generador de QR',
     description: 'Crea códigos QR personalizados al instante para URLs, redes sociales o productos, sin servidor.',
     to: '/tools/qr-generator',
+    popular: true,
     gradient: 'from-amber-500 to-orange-400',
     glow: 'rgba(245,158,11,0.3)',
     iconBg: 'bg-amber-500/10 dark:bg-amber-500/15',
@@ -98,6 +99,7 @@ const tools = [
     title: 'Agregar Logo',
     description: 'Añade tu marca o watermark a una o varias imágenes. Elige posición, tamaño y opacidad con preview en vivo.',
     to: '/tools/logo-stamper',
+    popular: true,
     gradient: 'from-pink-500 to-rose-500',
     glow: 'rgba(236,72,153,0.3)',
     iconBg: 'bg-pink-500/10 dark:bg-pink-500/15',
@@ -116,6 +118,7 @@ const tools = [
     title: 'Cuenta de Cobro',
     description: 'Crea cuentas de cobro profesionales en PDF con datos del cliente, servicios, total automático y conversión a letras.',
     to: '/tools/invoice-generator',
+    popular: true,
     gradient: 'from-emerald-500 to-teal-500',
     glow: 'rgba(16,185,129,0.3)',
     iconBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
@@ -151,6 +154,9 @@ const tools = [
 ];
 
 export default function ToolsPage() {
+  // Los "Más usados" siempre primero, manteniendo el orden original entre ellos
+  const sortedTools = [...tools].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
+
   return (
     <div className="space-y-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -191,11 +197,15 @@ export default function ToolsPage() {
 
         {/* ── Tools grid ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {tools.map((tool) => (
+          {sortedTools.map((tool) => (
             <Link
               key={tool.to}
               to={tool.to}
-              className={`group relative flex flex-col rounded-2xl border border-gray-200/60 dark:border-white/6 bg-white/60 dark:bg-white/2 backdrop-blur-sm p-6 transition-all duration-300 hover:-translate-y-1.5 ${tool.border}`}
+              className={`group relative flex flex-col rounded-2xl border bg-white/60 dark:bg-white/2 backdrop-blur-sm p-6 transition-all duration-300 hover:-translate-y-1.5 ${
+                tool.popular
+                  ? 'border-amber-400/60 dark:border-amber-500/40 shadow-[0_0_20px_-8px_rgba(245,158,11,0.4)]'
+                  : 'border-gray-200/60 dark:border-white/6'
+              } ${tool.border}`}
               style={{ '--glow': tool.glow }}
             >
               {/* Hover glow overlay */}
@@ -203,6 +213,16 @@ export default function ToolsPage() {
                 className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                 style={{ boxShadow: `inset 0 0 0 1px var(--glow), 0 8px 40px -8px var(--glow)` }}
               />
+
+              {/* Popular badge (top-left) */}
+              {tool.popular && (
+                <span className="absolute -top-2.5 left-4 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md tracking-wider uppercase z-10">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z" />
+                  </svg>
+                  Más usado
+                </span>
+              )}
 
               {/* Badge */}
               <span className={`absolute top-4 right-4 text-[10px] font-semibold px-2 py-0.5 rounded-full ${tool.badgeColor}`}>
