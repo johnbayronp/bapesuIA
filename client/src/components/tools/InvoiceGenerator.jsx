@@ -16,10 +16,25 @@ const DEFAULT_PAYMENT = {
   notes: '',
 };
 
-const formatCOP = (n) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
+const CURRENCY_META = {
+  COP: { code: 'COP', locale: 'es-CO', decimals: 0, symbol: '$' },
+  USD: { code: 'USD', locale: 'en-US', decimals: 2, symbol: 'US$' },
+};
 
-// Convert a number to Spanish words (for Colombian "cuenta de cobro").
+const formatMoney = (n, currency = 'COP') => {
+  const meta = CURRENCY_META[currency] || CURRENCY_META.COP;
+  return new Intl.NumberFormat(meta.locale, {
+    style: 'currency',
+    currency: meta.code,
+    minimumFractionDigits: meta.decimals,
+    maximumFractionDigits: meta.decimals,
+  }).format(n || 0);
+};
+
+const roundForCurrency = (n, currency = 'COP') =>
+  currency === 'USD' ? Math.round((n || 0) * 100) / 100 : Math.round(n || 0);
+
+// ─── Number to words: Spanish ───
 const UNIDADES = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte'];
 const DECENAS = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
 const CENTENAS = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
@@ -39,7 +54,6 @@ function seccionMenor1000(n) {
   return r === 0 ? CENTENAS[c] : `${CENTENAS[c]} ${seccionMenor1000(r)}`;
 }
 
-// Handles any group 1..999999 (used for thousands/millions/billions sections).
 function convertirGrupo(n) {
   if (n < 1000) return seccionMenor1000(n);
   const miles = Math.floor(n / 1000);
@@ -48,41 +62,144 @@ function convertirGrupo(n) {
   return resto > 0 ? `${prefijo} ${seccionMenor1000(resto)}` : prefijo;
 }
 
-// Applies Spanish apocope rules when "uno" precedes a noun.
 function aplicarApocope(texto) {
   return texto
-    .replace(/\bveintiuno\b(?=\s+(mil|millones|millón|billones|billón|pesos))/g, 'veintiún')
-    .replace(/\buno\b(?=\s+(mil|millones|millón|billones|billón|pesos))/g, 'un')
+    .replace(/\bveintiuno\b(?=\s+(mil|millones|millón|billones|billón|pesos|dólares))/g, 'veintiún')
+    .replace(/\buno\b(?=\s+(mil|millones|millón|billones|billón|pesos|dólares))/g, 'un')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function numeroALetras(num) {
-  const n = Math.floor(Math.abs(num || 0));
-  if (n === 0) return 'cero pesos m/cte';
+function numeroALetrasES(num, currency = 'COP') {
+  const entero = Math.floor(Math.abs(num || 0));
+  const centavos = Math.round((Math.abs(num || 0) - entero) * 100);
+  const sufijo = currency === 'USD' ? 'dólares' : 'pesos';
 
-  const billones      = Math.floor(n / 1_000_000_000_000);
-  const restoBill     = n % 1_000_000_000_000;
-  const millones      = Math.floor(restoBill / 1_000_000);
-  const restoMill     = restoBill % 1_000_000;
-  const miles         = Math.floor(restoMill / 1000);
-  const resto         = restoMill % 1000;
+  const construir = (n) => {
+    if (n === 0) return 'cero';
+    const billones  = Math.floor(n / 1_000_000_000_000);
+    const restoBill = n % 1_000_000_000_000;
+    const millones  = Math.floor(restoBill / 1_000_000);
+    const restoMill = restoBill % 1_000_000;
+    const miles     = Math.floor(restoMill / 1000);
+    const resto     = restoMill % 1000;
 
-  const partes = [];
-  if (billones > 0) {
-    partes.push(billones === 1 ? 'un billón' : `${convertirGrupo(billones)} billones`);
-  }
-  if (millones > 0) {
-    partes.push(millones === 1 ? 'un millón' : `${convertirGrupo(millones)} millones`);
-  }
-  if (miles > 0) {
-    partes.push(miles === 1 ? 'mil' : `${convertirGrupo(miles)} mil`);
-  }
-  if (resto > 0) partes.push(seccionMenor1000(resto));
+    const partes = [];
+    if (billones > 0) partes.push(billones === 1 ? 'un billón' : `${convertirGrupo(billones)} billones`);
+    if (millones > 0) partes.push(millones === 1 ? 'un millón' : `${convertirGrupo(millones)} millones`);
+    if (miles > 0)    partes.push(miles === 1 ? 'mil' : `${convertirGrupo(miles)} mil`);
+    if (resto > 0)    partes.push(seccionMenor1000(resto));
+    return partes.join(' ');
+  };
 
-  const texto = aplicarApocope(partes.join(' '));
-  return `${texto} pesos m/cte`;
+  let texto = `${construir(entero)} ${sufijo}`;
+  if (currency === 'USD' && centavos > 0) {
+    texto += ` con ${centavos}/100`;
+  } else {
+    texto += ' m/cte';
+  }
+  return aplicarApocope(texto);
 }
+
+// ─── Number to words: English ───
+const ENG_LESS20 = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const ENG_TENS   = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+function engUnder1000(n) {
+  if (n < 20) return ENG_LESS20[n];
+  if (n < 100) {
+    const t = Math.floor(n / 10);
+    const u = n % 10;
+    return u === 0 ? ENG_TENS[t] : `${ENG_TENS[t]}-${ENG_LESS20[u]}`;
+  }
+  const h = Math.floor(n / 100);
+  const r = n % 100;
+  return r === 0 ? `${ENG_LESS20[h]} hundred` : `${ENG_LESS20[h]} hundred ${engUnder1000(r)}`;
+}
+
+function numeroALetrasEN(num, currency = 'COP') {
+  const entero = Math.floor(Math.abs(num || 0));
+  const centavos = Math.round((Math.abs(num || 0) - entero) * 100);
+
+  const construir = (n) => {
+    if (n === 0) return 'zero';
+    const billion  = Math.floor(n / 1_000_000_000);
+    const restB    = n % 1_000_000_000;
+    const million  = Math.floor(restB / 1_000_000);
+    const restM    = restB % 1_000_000;
+    const thousand = Math.floor(restM / 1000);
+    const rest     = restM % 1000;
+
+    const parts = [];
+    if (billion > 0)  parts.push(`${engUnder1000(billion)} billion`);
+    if (million > 0)  parts.push(`${engUnder1000(million)} million`);
+    if (thousand > 0) parts.push(`${engUnder1000(thousand)} thousand`);
+    if (rest > 0)     parts.push(engUnder1000(rest));
+    return parts.join(' ');
+  };
+
+  const word = construir(entero);
+  const noun = currency === 'USD' ? 'U.S. dollars' : 'Colombian pesos';
+  const cents = String(centavos).padStart(2, '0');
+  return `${word} ${noun} and ${cents}/100`;
+}
+
+const numeroALetras = (num, currency, lang) =>
+  lang === 'en' ? numeroALetrasEN(num, currency) : numeroALetrasES(num, currency);
+
+// ─── Translations for the printed document ───
+const T = {
+  es: {
+    docTitle:        'Cuenta de Cobro',
+    number:          'N°',
+    debe:            'Debe a',
+    suma:            'La suma de',
+    porParte:        'Por parte de:',
+    concepto:        'Concepto:',
+    periodo:         'Período:',
+    desc:            'Descripción',
+    qty:             'Cant.',
+    price:           'Precio',
+    total:           'Total',
+    subtotal:        'Subtotal',
+    iva:             'IVA',
+    retefuente:      'Retefuente',
+    totalUpper:      'TOTAL',
+    paymentTitle:    'Datos de pago',
+    paymentSentence: ({ accType, bank, accNumber, holder }) =>
+      `Realizar el pago en la cuenta ${accType}${bank ? ` de ${bank}` : ''}${accNumber ? ` N° ${accNumber}` : ''}${holder ? ` a nombre de ${holder}` : ''}.`,
+    signIssuer:      'Firma del emisor',
+    receivedBy:      'Recibido por',
+    accountTypes: {
+      Ahorros: 'Ahorros', Corriente: 'Corriente', Nequi: 'Nequi', Daviplata: 'Daviplata', Otro: 'Otro',
+    },
+  },
+  en: {
+    docTitle:        'Invoice / Bill of Collection',
+    number:          'No.',
+    debe:            'Pay to',
+    suma:            'Amount of',
+    porParte:        'Billed to:',
+    concepto:        'Concept:',
+    periodo:         'Period:',
+    desc:            'Description',
+    qty:             'Qty',
+    price:           'Unit Price',
+    total:           'Total',
+    subtotal:        'Subtotal',
+    iva:             'VAT',
+    retefuente:      'Withholding Tax',
+    totalUpper:      'TOTAL',
+    paymentTitle:    'Payment Information',
+    paymentSentence: ({ accType, bank, accNumber, holder }) =>
+      `Please make the payment to the ${accType} account${bank ? ` at ${bank}` : ''}${accNumber ? `, account number ${accNumber}` : ''}${holder ? `, in the name of ${holder}` : ''}.`,
+    signIssuer:      'Issuer signature',
+    receivedBy:      'Received by',
+    accountTypes: {
+      Ahorros: 'Savings', Corriente: 'Checking', Nequi: 'Nequi', Daviplata: 'Daviplata', Otro: 'Other',
+    },
+  },
+};
 
 const INPUT_CLS =
   'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 transition';
@@ -115,6 +232,11 @@ export default function InvoiceGenerator() {
   const [ivaRate, setIvaRate]               = useState(19);
   const [includeRetefuente, setIncludeRetefuente] = useState(false);
   const [retefuenteRate, setRetefuenteRate]       = useState(11);
+  const [currency, setCurrency]             = useState('COP');
+  const [language, setLanguage]             = useState('es');
+
+  const t = T[language] || T.es;
+  const fmt = (n) => formatMoney(n, currency);
 
   const logoInputRef = useRef(null);
 
@@ -129,6 +251,8 @@ export default function InvoiceGenerator() {
       if (data.signatureName) setSignatureName(data.signatureName);
       if (data.signatureDoc)  setSignatureDoc(data.signatureDoc);
       if (data.city) setCity(data.city);
+      if (data.currency === 'USD' || data.currency === 'COP') setCurrency(data.currency);
+      if (data.language === 'en' || data.language === 'es')   setLanguage(data.language);
     } catch {
       // ignore
     }
@@ -139,21 +263,24 @@ export default function InvoiceGenerator() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ issuer, payment, signatureName, signatureDoc, city })
+        JSON.stringify({ issuer, payment, signatureName, signatureDoc, city, currency, language })
       );
     } catch {
       // ignore
     }
-  }, [issuer, payment, signatureName, signatureDoc, city]);
+  }, [issuer, payment, signatureName, signatureDoc, city, currency, language]);
 
   const subtotal = useMemo(
-    () => items.reduce((acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0),
-    [items]
+    () => roundForCurrency(
+      items.reduce((acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0),
+      currency
+    ),
+    [items, currency]
   );
-  const ivaAmount        = includeIva ? Math.round(subtotal * (ivaRate / 100)) : 0;
-  const retefuenteAmount = includeRetefuente ? Math.round(subtotal * (retefuenteRate / 100)) : 0;
-  const total            = subtotal + ivaAmount - retefuenteAmount;
-  const totalEnLetras    = useMemo(() => numeroALetras(total), [total]);
+  const ivaAmount        = includeIva ? roundForCurrency(subtotal * (ivaRate / 100), currency) : 0;
+  const retefuenteAmount = includeRetefuente ? roundForCurrency(subtotal * (retefuenteRate / 100), currency) : 0;
+  const total            = roundForCurrency(subtotal + ivaAmount - retefuenteAmount, currency);
+  const totalEnLetras    = useMemo(() => numeroALetras(total, currency, language), [total, currency, language]);
 
   const updateItem = (i, key, value) => {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, [key]: value } : it)));
@@ -183,9 +310,9 @@ export default function InvoiceGenerator() {
     }
 
     const originalTitle = document.title;
-    const safeClient = (client.name || 'Cliente').replace(/[\\/:*?"<>|]/g, '').trim();
+    const safeClient = (client.name || (language === 'en' ? 'Client' : 'Cliente')).replace(/[\\/:*?"<>|]/g, '').trim();
     const safeNumber = (invoiceNumber || '').toString().trim() || 's-n';
-    document.title = `Cuenta de Cobro ${safeNumber} - ${safeClient}`;
+    document.title = `${t.docTitle} ${safeNumber} - ${safeClient}`;
 
     const restore = () => {
       document.title = originalTitle;
@@ -218,8 +345,9 @@ export default function InvoiceGenerator() {
   const issueDateFormatted = useMemo(() => {
     if (!issueDate) return '';
     const d = new Date(issueDate + 'T00:00:00');
-    return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
-  }, [issueDate]);
+    const locale = language === 'en' ? 'en-US' : 'es-CO';
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+  }, [issueDate, language]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -260,6 +388,55 @@ export default function InvoiceGenerator() {
 
         {/* ── Form ── */}
         <div className="space-y-5 no-print">
+
+          {/* Moneda e idioma */}
+          <section className="bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/10 rounded-2xl p-5">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">Moneda e idioma del documento</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Moneda">
+                <div className="grid grid-cols-2 gap-2">
+                  {['COP', 'USD'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCurrency(c)}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold border transition ${
+                        currency === c
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-[0_2px_8px_rgba(16,185,129,0.4)]'
+                          : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-white/10 hover:border-emerald-400'
+                      }`}
+                    >
+                      {c === 'COP' ? '🇨🇴 Pesos COP' : '🇺🇸 Dólares USD'}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Idioma del documento">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'es', label: '🇪🇸 Español' },
+                    { id: 'en', label: '🇬🇧 English' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setLanguage(opt.id)}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold border transition ${
+                        language === opt.id
+                          ? 'bg-indigo-500 text-white border-indigo-500 shadow-[0_2px_8px_rgba(99,102,241,0.4)]'
+                          : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-white/10 hover:border-indigo-400'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+              Solo cambia el formato y los textos del documento. Los valores que escribas se interpretan en la moneda elegida.
+            </p>
+          </section>
 
           {/* Emisor */}
           <section className="bg-white dark:bg-white/3 border border-gray-200 dark:border-white/8 rounded-2xl p-5">
@@ -399,7 +576,7 @@ export default function InvoiceGenerator() {
                         onChange={(e) => updateItem(i, 'unitPrice', e.target.value)} placeholder="Precio" />
                     </div>
                     <div className="col-span-3 sm:col-span-1 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 pt-2.5">
-                      {formatCOP(row)}
+                      {fmt(row)}
                     </div>
                     <div className="col-span-1 flex justify-end pt-1">
                       {items.length > 1 && (
@@ -437,11 +614,11 @@ export default function InvoiceGenerator() {
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10 space-y-1.5 text-sm">
-              <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCOP(subtotal)}</span></div>
-              {includeIva        && <div className="flex justify-between text-gray-500"><span>IVA ({ivaRate}%)</span><span>{formatCOP(ivaAmount)}</span></div>}
-              {includeRetefuente && <div className="flex justify-between text-gray-500"><span>Retefuente ({retefuenteRate}%)</span><span>− {formatCOP(retefuenteAmount)}</span></div>}
+              <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+              {includeIva        && <div className="flex justify-between text-gray-500"><span>IVA ({ivaRate}%)</span><span>{fmt(ivaAmount)}</span></div>}
+              {includeRetefuente && <div className="flex justify-between text-gray-500"><span>Retefuente ({retefuenteRate}%)</span><span>− {fmt(retefuenteAmount)}</span></div>}
               <div className="flex justify-between font-bold text-gray-900 dark:text-white text-base pt-2 border-t border-gray-200 dark:border-white/10">
-                <span>Total a pagar</span><span>{formatCOP(total)}</span>
+                <span>Total a pagar</span><span>{fmt(total)}</span>
               </div>
             </div>
           </section>
@@ -544,8 +721,8 @@ export default function InvoiceGenerator() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs tracking-widest uppercase text-gray-500">Cuenta de Cobro</div>
-                <div className="text-2xl font-extrabold">N° {invoiceNumber || '—'}</div>
+                <div className="text-xs tracking-widest uppercase text-gray-500">{t.docTitle}</div>
+                <div className="text-2xl font-extrabold">{t.number} {invoiceNumber || '—'}</div>
                 {city && <div className="text-xs mt-1">{city}, {issueDateFormatted}</div>}
                 {!city && <div className="text-xs mt-1">{issueDateFormatted}</div>}
               </div>
@@ -553,22 +730,22 @@ export default function InvoiceGenerator() {
 
             {/* Title block */}
             <div className="text-center py-5">
-              <div className="uppercase text-xs tracking-widest text-gray-500">Debe a</div>
+              <div className="uppercase text-xs tracking-widest text-gray-500">{t.debe}</div>
               <div className="font-bold text-lg">{issuer.name || '—'}</div>
-              {issuer.nit && <div className="text-xs text-gray-600">NIT/CC: {issuer.nit}</div>}
-              <div className="uppercase text-xs tracking-widest text-gray-500 mt-4">La suma de</div>
+              {issuer.nit && <div className="text-xs text-gray-600">{language === 'en' ? 'Tax ID' : 'NIT/CC'}: {issuer.nit}</div>}
+              <div className="uppercase text-xs tracking-widest text-gray-500 mt-4">{t.suma}</div>
               <div className="font-bold text-base uppercase">{totalEnLetras}</div>
-              <div className="font-extrabold text-xl mt-1">{formatCOP(total)}</div>
+              <div className="font-extrabold text-xl mt-1">{fmt(total)}</div>
             </div>
 
             {/* Cliente */}
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">Por parte de:</div>
+              <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">{t.porParte}</div>
               <div className="font-bold">{client.name || '—'}</div>
-              {client.nit     && <div>NIT/CC: {client.nit}</div>}
+              {client.nit     && <div>{language === 'en' ? 'Tax ID' : 'NIT/CC'}: {client.nit}</div>}
               {client.address && <div>{client.address}</div>}
               <div className="flex gap-3 flex-wrap text-xs text-gray-600">
-                {client.phone && <span>Tel: {client.phone}</span>}
+                {client.phone && <span>{language === 'en' ? 'Phone' : 'Tel'}: {client.phone}</span>}
                 {client.email && <span>{client.email}</span>}
               </div>
             </div>
@@ -577,10 +754,10 @@ export default function InvoiceGenerator() {
             {(concept || period) && (
               <div className="mb-4">
                 {concept && (
-                  <p><span className="font-semibold">Concepto: </span>{concept}</p>
+                  <p><span className="font-semibold">{t.concepto} </span>{concept}</p>
                 )}
                 {period && (
-                  <p><span className="font-semibold">Período: </span>{period}</p>
+                  <p><span className="font-semibold">{t.periodo} </span>{period}</p>
                 )}
               </div>
             )}
@@ -589,10 +766,10 @@ export default function InvoiceGenerator() {
             <table className="w-full border-collapse mb-4">
               <thead>
                 <tr className="bg-gray-900 text-white">
-                  <th className="text-left p-2 text-xs font-semibold">Descripción</th>
-                  <th className="text-center p-2 text-xs font-semibold w-16">Cant.</th>
-                  <th className="text-right p-2 text-xs font-semibold w-28">Precio</th>
-                  <th className="text-right p-2 text-xs font-semibold w-28">Total</th>
+                  <th className="text-left p-2 text-xs font-semibold">{t.desc}</th>
+                  <th className="text-center p-2 text-xs font-semibold w-16">{t.qty}</th>
+                  <th className="text-right p-2 text-xs font-semibold w-28">{t.price}</th>
+                  <th className="text-right p-2 text-xs font-semibold w-28">{t.total}</th>
                 </tr>
               </thead>
               <tbody>
@@ -602,8 +779,8 @@ export default function InvoiceGenerator() {
                     <tr key={i} className="border-b border-gray-200">
                       <td className="p-2 align-top">{it.description || <span className="text-gray-400">—</span>}</td>
                       <td className="p-2 text-center">{it.quantity || 0}</td>
-                      <td className="p-2 text-right">{formatCOP(Number(it.unitPrice) || 0)}</td>
-                      <td className="p-2 text-right font-semibold">{formatCOP(row)}</td>
+                      <td className="p-2 text-right">{fmt(Number(it.unitPrice) || 0)}</td>
+                      <td className="p-2 text-right font-semibold">{fmt(row)}</td>
                     </tr>
                   );
                 })}
@@ -615,24 +792,24 @@ export default function InvoiceGenerator() {
               <table className="text-[13px]">
                 <tbody>
                   <tr>
-                    <td className="pr-6 text-gray-600">Subtotal</td>
-                    <td className="text-right font-semibold">{formatCOP(subtotal)}</td>
+                    <td className="pr-6 text-gray-600">{t.subtotal}</td>
+                    <td className="text-right font-semibold">{fmt(subtotal)}</td>
                   </tr>
                   {includeIva && (
                     <tr>
-                      <td className="pr-6 text-gray-600">IVA ({ivaRate}%)</td>
-                      <td className="text-right font-semibold">{formatCOP(ivaAmount)}</td>
+                      <td className="pr-6 text-gray-600">{t.iva} ({ivaRate}%)</td>
+                      <td className="text-right font-semibold">{fmt(ivaAmount)}</td>
                     </tr>
                   )}
                   {includeRetefuente && (
                     <tr>
-                      <td className="pr-6 text-gray-600">Retefuente ({retefuenteRate}%)</td>
-                      <td className="text-right font-semibold">− {formatCOP(retefuenteAmount)}</td>
+                      <td className="pr-6 text-gray-600">{t.retefuente} ({retefuenteRate}%)</td>
+                      <td className="text-right font-semibold">− {fmt(retefuenteAmount)}</td>
                     </tr>
                   )}
                   <tr>
-                    <td className="pr-6 pt-2 border-t-2 border-gray-900 font-bold uppercase">Total</td>
-                    <td className="text-right pt-2 border-t-2 border-gray-900 font-extrabold text-base">{formatCOP(total)}</td>
+                    <td className="pr-6 pt-2 border-t-2 border-gray-900 font-bold uppercase">{t.totalUpper}</td>
+                    <td className="text-right pt-2 border-t-2 border-gray-900 font-extrabold text-base">{fmt(total)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -641,14 +818,15 @@ export default function InvoiceGenerator() {
             {/* Payment info */}
             {(payment.bank || payment.accountNumber || payment.notes) && (
               <div className="mt-6 p-4 border border-gray-300 rounded-lg">
-                <div className="text-xs uppercase tracking-wider text-gray-500 mb-2 font-semibold">Datos de pago</div>
+                <div className="text-xs uppercase tracking-wider text-gray-500 mb-2 font-semibold">{t.paymentTitle}</div>
                 {(payment.bank || payment.accountType || payment.accountNumber) && (
                   <p>
-                    Realizar el pago en la cuenta <span className="font-semibold">{payment.accountType}</span>
-                    {payment.bank        && <> de <span className="font-semibold">{payment.bank}</span></>}
-                    {payment.accountNumber && <> N° <span className="font-semibold">{payment.accountNumber}</span></>}
-                    {payment.accountHolder && <> a nombre de <span className="font-semibold">{payment.accountHolder}</span></>}
-                    .
+                    {t.paymentSentence({
+                      accType:   t.accountTypes[payment.accountType] || payment.accountType,
+                      bank:      payment.bank,
+                      accNumber: payment.accountNumber,
+                      holder:    payment.accountHolder,
+                    })}
                   </p>
                 )}
                 {payment.notes && <p className="mt-1 text-gray-700">{payment.notes}</p>}
@@ -668,13 +846,13 @@ export default function InvoiceGenerator() {
                 <div className="border-t border-gray-400 pt-1 text-center">
                   <div className="font-semibold">{signatureName || issuer.name || '—'}</div>
                   {signatureDoc ? <div className="text-gray-600">{signatureDoc}</div> :
-                    issuer.nit && <div className="text-gray-600">NIT/CC: {issuer.nit}</div>}
-                  <div className="text-gray-500 mt-1">Firma del emisor</div>
+                    issuer.nit && <div className="text-gray-600">{language === 'en' ? 'Tax ID' : 'NIT/CC'}: {issuer.nit}</div>}
+                  <div className="text-gray-500 mt-1">{t.signIssuer}</div>
                 </div>
               </div>
               <div>
                 <div className="border-t border-gray-400 pt-1 text-center">
-                  <div className="text-gray-500">Recibido por</div>
+                  <div className="text-gray-500">{t.receivedBy}</div>
                 </div>
               </div>
             </div>
