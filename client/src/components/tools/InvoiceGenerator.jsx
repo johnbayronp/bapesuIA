@@ -93,12 +93,14 @@ function numeroALetrasES(num, currency = 'COP') {
   };
 
   let texto = `${construir(entero)} ${sufijo}`;
-  if (currency === 'USD' && centavos > 0) {
-    texto += ` con ${centavos}/100`;
+  if (currency === 'USD') {
+    const cents = String(centavos).padStart(2, '0');
+    texto += ` con ${cents}/100 USD`;
   } else {
     texto += ' m/cte';
   }
-  return aplicarApocope(texto);
+  texto = aplicarApocope(texto);
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 // ─── Number to words: English ───
@@ -138,10 +140,11 @@ function numeroALetrasEN(num, currency = 'COP') {
     return parts.join(' ');
   };
 
-  const word = construir(entero);
-  const noun = currency === 'USD' ? 'U.S. dollars' : 'Colombian pesos';
+  const word  = construir(entero);
+  const noun  = currency === 'USD' ? 'dollars' : 'pesos';
   const cents = String(centavos).padStart(2, '0');
-  return `${word} ${noun} and ${cents}/100`;
+  const phrase = `${word} ${noun} and ${cents}/100 ${currency}`;
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }
 
 const numeroALetras = (num, currency, lang) =>
@@ -237,6 +240,7 @@ export default function InvoiceGenerator() {
 
   const t = T[language] || T.es;
   const fmt = (n) => formatMoney(n, currency);
+  const fmtWithCode = (n) => `${formatMoney(n, currency)}${currency === 'USD' ? ' USD' : ''}`;
 
   const logoInputRef = useRef(null);
 
@@ -733,9 +737,13 @@ export default function InvoiceGenerator() {
               <div className="uppercase text-xs tracking-widest text-gray-500">{t.debe}</div>
               <div className="font-bold text-lg">{issuer.name || '—'}</div>
               {issuer.nit && <div className="text-xs text-gray-600">{language === 'en' ? 'Tax ID' : 'NIT/CC'}: {issuer.nit}</div>}
-              <div className="uppercase text-xs tracking-widest text-gray-500 mt-4">{t.suma}</div>
-              <div className="font-bold text-base uppercase">{totalEnLetras}</div>
-              <div className="font-extrabold text-xl mt-1">{fmt(total)}</div>
+              {currency === 'COP' && (
+                <>
+                  <div className="uppercase text-xs tracking-widest text-gray-500 mt-4">{t.suma}</div>
+                  <div className="font-bold text-base uppercase">{totalEnLetras}</div>
+                </>
+              )}
+              <div className="font-extrabold text-xl mt-1">{fmtWithCode(total)}</div>
             </div>
 
             {/* Cliente */}
@@ -809,7 +817,7 @@ export default function InvoiceGenerator() {
                   )}
                   <tr>
                     <td className="pr-6 pt-2 border-t-2 border-gray-900 font-bold uppercase">{t.totalUpper}</td>
-                    <td className="text-right pt-2 border-t-2 border-gray-900 font-extrabold text-base">{fmt(total)}</td>
+                    <td className="text-right pt-2 border-t-2 border-gray-900 font-extrabold text-base">{fmtWithCode(total)}</td>
                   </tr>
                 </tbody>
               </table>
