@@ -32,7 +32,7 @@ function tasaSolidaridad(salario) {
 }
 
 const INPUT_CLS =
-  'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 transition';
+  'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/10 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 transition';
 
 function NumInput({ value, onChange, ...rest }) {
   return (
@@ -83,10 +83,10 @@ function Toggle({ label, checked, onChange, color = 'indigo', hint }) {
         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${checked ? 'left-[18px]' : 'left-0.5'}`} />
       </span>
       <span className="flex-1">
-        <span className="block text-xs font-semibold text-gray-700 dark:text-gray-300">{label}</span>
-        {hint && <span className="block text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">{hint}</span>}
+        <span className="block text-xs font-semibold text-gray-700 dark:text-gray-200">{label}</span>
+        {hint && <span className="block text-[10px] text-gray-400 dark:text-gray-400 mt-0.5">{hint}</span>}
       </span>
-      <span className={`text-[10px] font-bold uppercase tracking-wider ${checked ? `text-${color === 'amber' ? 'amber' : color}-500` : 'text-gray-400'}`}>
+      <span className={`text-[10px] font-bold uppercase tracking-wider ${checked ? `text-${color === 'amber' ? 'amber' : color}-500` : 'text-gray-400 dark:text-gray-500'}`}>
         {checked ? 'Sí' : 'No'}
       </span>
     </button>
@@ -235,20 +235,20 @@ export default function PayrollCalculator() {
       </div>
 
       {/* ── Card principal ── */}
-      <div className="bg-white dark:bg-white/3 border border-gray-200 dark:border-white/8 rounded-2xl p-6 sm:p-8 shadow-sm">
+      <div className="bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/10 rounded-2xl p-6 sm:p-8 shadow-sm">
 
-        <div className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-2">
+        <div className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-400 mb-2">
           Salario mensual
         </div>
 
         {/* Salario grande + botón calcular */}
         <div className="flex flex-col sm:flex-row items-stretch gap-3">
           <div className="relative flex-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400 font-light">$</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400 dark:text-gray-300 font-light">$</span>
             <MoneyInput
               value={salario}
               onChange={setSalario}
-              className="w-full pl-10 pr-4 py-4 text-3xl sm:text-4xl font-extrabold rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full pl-10 pr-4 py-4 text-3xl sm:text-4xl font-extrabold rounded-xl border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400"
               placeholder={new Intl.NumberFormat('es-CO').format(SMMLV_2026)}
             />
           </div>
@@ -265,7 +265,7 @@ export default function PayrollCalculator() {
           </button>
         </div>
 
-        <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
+        <p className="text-xs text-gray-400 dark:text-gray-400 mt-2">
           • Salario mínimo 2026: <span className="font-semibold">{formatCOP(SMMLV_2026)}</span>
           {calc.tieneAux && <> · {calc.auxLabel}: <span className="font-semibold">{formatCOP(AUX_2026)}</span></>}
         </p>
@@ -273,19 +273,19 @@ export default function PayrollCalculator() {
         {/* Toggles row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
           <label className="flex flex-col">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-1.5">Riesgo Laboral (ARL)</span>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-400 mb-1.5">Riesgo Laboral (ARL)</span>
             <select className={INPUT_CLS} value={riesgoArl} onChange={(e) => setRiesgoArl(e.target.value)}>
               {Object.entries(ARL).map(([k, v]) => (
-                <option key={k} value={k}>{v.label} ({v.tasa}%)</option>
+                <option key={k} value={k} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">{v.label} ({v.tasa}%)</option>
               ))}
             </select>
           </label>
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-1.5 block">Exonerado (Ley 1819)</span>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-400 mb-1.5 block">Exonerado (Ley 1819)</span>
             <Toggle label="Exoneración aportes" hint={`Aplica si salario < ${formatCOP(TOPE_EXONER)}`} checked={exonerado} onChange={setExonerado} color="emerald" />
           </div>
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-1.5 block">¿Trabajo remoto?</span>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-400 mb-1.5 block">¿Trabajo remoto?</span>
             <Toggle label="Aux. Conectividad (Ley 2088)" hint="Reemplaza el aux. de transporte" checked={trabajoRemoto} onChange={setTrabajoRemoto} color="amber" />
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function PayrollCalculator() {
         {/* Botón ajustes avanzados */}
         <button
           onClick={() => setShowModal(true)}
-          className="w-full mt-5 py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/15 hover:border-amber-400 dark:hover:border-amber-500/60 hover:bg-amber-50 dark:hover:bg-amber-500/5 text-gray-600 dark:text-gray-300 text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+          className="w-full mt-5 py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/20 hover:border-amber-400 dark:hover:border-amber-500/60 hover:bg-amber-50 dark:hover:bg-amber-500/10 text-gray-600 dark:text-gray-200 text-sm font-semibold flex items-center justify-center gap-2 transition-all"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
           Añadir Horas Extras, Comisiones y Ajustes
@@ -307,7 +307,7 @@ export default function PayrollCalculator() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
 
         {/* Empleado */}
-        <div className="relative bg-white dark:bg-white/3 border-2 border-emerald-500/40 rounded-2xl p-6 overflow-hidden">
+        <div className="relative bg-white dark:bg-white/[0.04] border-2 border-emerald-500/40 rounded-2xl p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full -translate-y-20 translate-x-20" />
           <div className="relative">
             <div className="flex items-center gap-2 mb-1">
@@ -349,13 +349,13 @@ export default function PayrollCalculator() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
 
         {/* Desprendible empleado */}
-        <div className="bg-white dark:bg-white/3 border border-gray-200 dark:border-white/8 rounded-2xl p-6">
+        <div className="bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/10 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-white">
               <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
               Desprendible Empleado
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-full">{calc.diasT} Días Liquidados</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-full">{calc.diasT} Días Liquidados</span>
           </div>
 
           <SectionTitle>Ingresos (devengados)</SectionTitle>
@@ -393,7 +393,7 @@ export default function PayrollCalculator() {
         </div>
 
         {/* Costo real empresa */}
-        <div className="bg-white dark:bg-white/3 border border-gray-200 dark:border-white/8 rounded-2xl p-6">
+        <div className="bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/10 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-white">
               <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5" /></svg>
@@ -521,7 +521,7 @@ export default function PayrollCalculator() {
 
 function SectionTitle({ children, className = '' }) {
   return (
-    <div className={`text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600 mb-2 ${className}`}>
+    <div className={`text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ${className}`}>
       {children}
     </div>
   );
@@ -529,14 +529,14 @@ function SectionTitle({ children, className = '' }) {
 
 function DetailRow({ label, value, icon, danger, muted }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-white/5 text-sm">
-      <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+    <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-white/10 text-sm">
+      <span className="text-gray-700 dark:text-gray-200 flex items-center gap-2">
         {icon && <span className="text-base">{icon}</span>}
         {label}
       </span>
       <span className={`tabular-nums font-medium ${
-        muted  ? 'text-emerald-500 text-xs italic' :
-        danger ? 'text-red-500' :
+        muted  ? 'text-emerald-500 dark:text-emerald-400 text-xs italic' :
+        danger ? 'text-red-500 dark:text-red-400' :
         'text-gray-900 dark:text-white'
       }`}>
         {value}
@@ -548,7 +548,7 @@ function DetailRow({ label, value, icon, danger, muted }) {
 function TotalRow({ label, value, color = 'emerald' }) {
   const colors = {
     emerald: 'border-l-emerald-500 text-gray-900 dark:text-white',
-    red:     'border-l-red-500 text-red-500',
+    red:     'border-l-red-500 text-red-500 dark:text-red-400',
   };
   return (
     <div className={`mt-2 pl-3 border-l-4 ${colors[color]} flex items-center justify-between py-2`}>
@@ -560,8 +560,8 @@ function TotalRow({ label, value, color = 'emerald' }) {
 
 function Subtotal({ label, value }) {
   return (
-    <div className="mt-2 pl-3 border-l-4 border-l-gray-400 dark:border-l-gray-600 flex items-center justify-between py-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">{label}</span>
+    <div className="mt-2 pl-3 border-l-4 border-l-gray-400 dark:border-l-gray-500 flex items-center justify-between py-1.5">
+      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">{label}</span>
       <span className="font-bold text-sm tabular-nums text-gray-900 dark:text-white">{value}</span>
     </div>
   );
@@ -570,22 +570,22 @@ function Subtotal({ label, value }) {
 function FieldBox({ label, hint, children }) {
   return (
     <label className="block">
-      <span className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{label}</span>
+      <span className="block text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1.5">{label}</span>
       {children}
-      {hint && <span className="block text-[10px] text-gray-400 dark:text-gray-600 mt-1">{hint}</span>}
+      {hint && <span className="block text-[10px] text-gray-400 dark:text-gray-400 mt-1">{hint}</span>}
     </label>
   );
 }
 
 function RowInput({ label, value, onChange }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
-      <span className="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1">{label}</span>
+    <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/10">
+      <span className="text-xs font-medium text-gray-700 dark:text-gray-200 flex-1">{label}</span>
       <input
         type="number" min="0"
         value={value || ''}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
-        className="w-16 px-2 py-1 text-sm text-right rounded border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-amber-400"
+        className="w-16 px-2 py-1 text-sm text-right rounded border border-gray-200 dark:border-white/15 bg-white dark:bg-white/10 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 tabular-nums focus:outline-none focus:ring-1 focus:ring-amber-400"
         placeholder="0"
       />
     </div>
