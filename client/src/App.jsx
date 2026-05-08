@@ -21,6 +21,7 @@ import QrGenerator from './components/tools/QrGenerator';
 import LogoStamper from './components/tools/LogoStamper';
 import InvoiceGenerator from './components/tools/InvoiceGenerator';
 import PayrollCalculator from './components/tools/PayrollCalculator';
+import QuotationGenerator from './components/tools/QuotationGenerator';
 import AdScriptLoader from './components/adsence/AdScriptLoader';
 import UserProfile from './components/auth/UserProfile';
 import UserProfileDebug from './components/auth/UserProfileDebug';
@@ -123,6 +124,7 @@ function App() {
               <Route path="/tools/logo-stamper" element={<LogoStamper />} />
               <Route path="/tools/invoice-generator" element={<InvoiceGenerator />} />
               <Route path="/tools/payroll-calculator" element={<PayrollCalculator />} />
+              <Route path="/tools/quotation-generator" element={<QuotationGenerator />} />
 
               {/* Rutas de Studio */}
               <Route path="/studio" element={<StudioPage />} />
