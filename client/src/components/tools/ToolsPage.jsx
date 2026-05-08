@@ -134,6 +134,25 @@ const tools = [
     ),
   },
   {
+    title: 'Cotización Rápida',
+    description: 'Genera cotizaciones profesionales con vista previa en tiempo real. Logo, ítems, totales automáticos y descarga en PDF.',
+    to: '/tools/quotation-generator',
+    popular: true,
+    gradient: 'from-yellow-400 to-amber-500',
+    glow: 'rgba(234,179,8,0.3)',
+    iconBg: 'bg-yellow-500/10 dark:bg-yellow-500/15',
+    iconColor: 'text-yellow-500 dark:text-yellow-400',
+    border: 'hover:border-yellow-500/40',
+    badge: 'Nuevo',
+    badgeColor: 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/25',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    ),
+  },
+  {
     title: 'Nómina Colombia 2026',
     description: 'Calcula salario neto, aportes, prestaciones sociales y costo total empresa según la ley colombiana. Descarga la colilla en PDF.',
     to: '/tools/payroll-calculator',
