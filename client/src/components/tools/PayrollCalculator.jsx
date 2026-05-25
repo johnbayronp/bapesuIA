@@ -85,7 +85,7 @@ function Toggle({ label, checked, onChange, color = 'indigo', hint }) {
       <span className="flex-1">
         <span className="block text-xs font-semibold text-gray-700 dark:text-gray-200">{label}</span>
         {hint && <span className="block text-[10px] text-gray-400 dark:text-gray-400 mt-0.5">{hint}</span>}
-      </span>
+      </span>v
       <span className={`text-[10px] font-bold uppercase tracking-wider ${checked ? `text-${color === 'amber' ? 'amber' : color}-500` : 'text-gray-400 dark:text-gray-500'}`}>
         {checked ? 'Sí' : 'No'}
       </span>

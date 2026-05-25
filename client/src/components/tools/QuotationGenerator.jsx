@@ -103,6 +103,40 @@ export default function QuotationGenerator() {
     } catch { /* ignore */ }
   }, []);
 
+  // Si el usuario tiene sesión + empresa, precargar sus datos (multi-tenant)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+
+        const { data: profile } = await supabase
+          .from('users').select('company_id').eq('id', user.id).maybeSingle();
+        if (!profile?.company_id || cancelled) return;
+
+        const { data: comp } = await supabase
+          .from('bapesu_companies').select('*').eq('id', profile.company_id).maybeSingle();
+        if (!comp || cancelled) return;
+
+        // Solo sobrescribimos si los campos están vacíos en localStorage / defaults
+        setCompany((p) => ({
+          ...p,
+          name:        comp.name      || p.name,
+          tagline:     comp.tagline   || p.tagline,
+          nit:         comp.nit       || p.nit,
+          phone:       comp.phone     || p.phone,
+          email:       comp.email     || p.email,
+          instagram:   comp.instagram || p.instagram,
+          website:     comp.website   || p.website,
+          paymentInfo: comp.payment_info || p.paymentInfo,
+          logoUrl:     comp.logo_url  || p.logoUrl,
+        }));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ company, quote }));
