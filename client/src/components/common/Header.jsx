@@ -8,7 +8,6 @@ const Header = () => {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
@@ -19,14 +18,11 @@ const Header = () => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-      if (user) checkAdminStatus(user.id);
     };
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) checkAdminStatus(session.user.id);
-      else setIsAdmin(false);
     });
 
     return () => subscription.unsubscribe();
@@ -56,23 +52,12 @@ const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isUserMenuOpen]);
 
-  const checkAdminStatus = async (userId) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('users').select('role').eq('id', userId).single();
-      setIsAdmin(!error && profile?.role === 'admin');
-    } catch {
-      setIsAdmin(false);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
       sessionStorage.removeItem('access_token');
       localStorage.removeItem('access_token');
       setUser(null);
-      setIsAdmin(false);
       navigate('/login');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
@@ -137,12 +122,6 @@ const Header = () => {
               ☕ Colabora
             </Link>
 
-            {user && isAdmin && (
-              <Link to="/admin" className={navLinkClass('/admin')} onClick={() => setIsMenuOpen(false)}>
-                Administrador
-              </Link>
-            )}
-
             {/* Auth section */}
             {user ? (
               <>
@@ -155,7 +134,8 @@ const Header = () => {
                     <div className="flex-1">
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
                       <div className="flex gap-3 mt-1">
-                        <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600">Mi Perfil</Link>
+                        <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className="text-xs text-yellow-500 hover:text-yellow-400 font-semibold">Mi Panel</Link>
+                        <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600">Perfil</Link>
                         <button onClick={handleLogout} className="text-xs text-red-500 hover:text-red-600">Salir</button>
                       </div>
                     </div>
@@ -180,6 +160,11 @@ const Header = () => {
                   {isUserMenuOpen && (
                     <div className="absolute right-0 mt-2 w-52 rounded-xl shadow-2xl bg-white/95 dark:bg-[#0d0d1a]/95 backdrop-blur-xl border border-gray-100 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/5 z-[60] overflow-hidden">
                       <div className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-white/5 truncate">{user.email}</div>
+                      <Link to="/dashboard" onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-500/10 transition-colors font-semibold">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        Mi Panel
+                      </Link>
                       <Link to="/profile" onClick={() => setIsUserMenuOpen(false)}
                         className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
