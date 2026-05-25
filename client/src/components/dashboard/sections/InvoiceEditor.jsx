@@ -366,11 +366,22 @@ export default function InvoiceEditor() {
         <div id="invoice-preview-col">
           <div id="invoice-print" className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden text-gray-900">
             {/* Header */}
-            <div style={{ background: '#064e3b', color: '#fff' }} className="px-7 py-5 flex items-center justify-between">
-              <div>
-                {company?.logo_url && <img src={company.logo_url} alt="logo" className="h-9 mb-2 object-contain" onError={(e) => { e.target.style.display = 'none'; }} />}
-                <h2 className="text-xl font-extrabold leading-tight">{company?.name ?? 'TU EMPRESA'}</h2>
-                {company?.nit && <p className="text-[10px] opacity-80 mt-0.5">NIT: {company.nit}</p>}
+            <div style={{ background: '#064e3b', color: '#fff' }} className="px-7 py-5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                {company?.logo_url && (
+                  <div className="flex-shrink-0 bg-white rounded-xl p-1.5 shadow-md">
+                    <img
+                      src={company.logo_url}
+                      alt="logo"
+                      className="h-14 w-14 object-contain rounded-lg"
+                      onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h2 className="text-xl font-extrabold leading-tight truncate">{company?.name ?? 'TU EMPRESA'}</h2>
+                  {company?.nit && <p className="text-[10px] opacity-80 mt-0.5">NIT: {company.nit}</p>}
+                </div>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-widest opacity-70">Cuenta de cobro</p>
