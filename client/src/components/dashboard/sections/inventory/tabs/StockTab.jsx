@@ -96,10 +96,17 @@ export default function StockTab({ products, movements, onAdjustStock }) {
                 </div>
                 <div className="hidden md:block col-span-1 text-center">
                   <span className={`text-sm font-bold ${p.stock_available <= 0 ? 'text-red-600' : 'text-gray-900'}`}>{p.stock_available ?? 0}</span>
+                  {p.unit && <span className="text-[10px] text-gray-400 ml-0.5">{p.unit}</span>}
                 </div>
-                <div className="hidden md:block col-span-1 text-center text-xs text-amber-600 font-medium">{p.stock_reserved ?? 0}</div>
-                <div className="hidden md:block col-span-1 text-center text-xs text-blue-600 font-medium">{p.stock_in_transit ?? 0}</div>
-                <div className="hidden md:block col-span-1 text-center text-xs text-gray-400">{p.stock_min ?? 0}</div>
+                <div className="hidden md:block col-span-1 text-center text-xs text-amber-600 font-medium">
+                  {p.stock_reserved ?? 0}{p.unit && <span className="text-[10px] text-amber-400 ml-0.5">{p.unit}</span>}
+                </div>
+                <div className="hidden md:block col-span-1 text-center text-xs text-blue-600 font-medium">
+                  {p.stock_in_transit ?? 0}{p.unit && <span className="text-[10px] text-blue-400 ml-0.5">{p.unit}</span>}
+                </div>
+                <div className="hidden md:block col-span-1 text-center text-xs text-gray-400">
+                  {p.stock_min ?? 0}{p.unit && <span className="text-[10px] text-gray-300 ml-0.5">{p.unit}</span>}
+                </div>
                 <div className="hidden md:block col-span-2 text-xs text-gray-500 truncate">{p.stock_location ?? '—'}</div>
                 <div className="col-span-3 md:col-span-1">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${st.color}`}>{st.label}</span>
@@ -137,6 +144,7 @@ export default function StockTab({ products, movements, onAdjustStock }) {
                   <div className="text-right flex-shrink-0">
                     <p className={`text-sm font-bold ${isIn ? 'text-emerald-600' : 'text-red-500'}`}>
                       {isIn ? '+' : ''}{m.quantity}
+                      {m.bapesu_products?.unit && <span className="text-[10px] font-normal ml-0.5 opacity-70">{m.bapesu_products.unit}</span>}
                     </p>
                     <p className="text-[10px] text-gray-400">
                       {new Date(m.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
