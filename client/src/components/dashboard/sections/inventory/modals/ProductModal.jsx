@@ -1,7 +1,7 @@
 import React from 'react';
 import { INPUT, LABEL, UNITS, formatPriceCOP, parsePriceCOP } from '../constants';
 
-export default function ProductModal({ modal, form, setF, categories, onSave, onClose, saving, error }) {
+export default function ProductModal({ modal, form, setF, categories, warehouses = [], suppliers = [], onSave, onClose, saving, error }) {
   if (!modal) return null;
 
   return (
@@ -85,9 +85,29 @@ export default function ProductModal({ modal, form, setF, categories, onSave, on
                   </div>
                 ))}
               </div>
-              <div className="mt-3">
-                <label className={LABEL}>Ubicación / Bodega</label>
-                <input className={INPUT} value={form.stock_location} onChange={(e) => setF('stock_location', e.target.value)} placeholder="Ej: Bodega A, Estante 3" />
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className={LABEL}>Ubicación / Bodega</label>
+                  {warehouses.length > 0 ? (
+                    <select className={INPUT} value={form.stock_location} onChange={(e) => setF('stock_location', e.target.value)}>
+                      <option value="">— Sin especificar —</option>
+                      {warehouses.map((w) => (
+                        <option key={w.id} value={w.name}>{w.name}{w.address ? ` · ${w.address}` : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className={INPUT} value={form.stock_location} onChange={(e) => setF('stock_location', e.target.value)} placeholder="Ej: Bodega A, Estante 3" />
+                  )}
+                </div>
+                <div>
+                  <label className={LABEL}>Proveedor principal</label>
+                  <select className={INPUT} value={form.supplier_id} onChange={(e) => setF('supplier_id', e.target.value)}>
+                    <option value="">— Sin especificar —</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 

@@ -18,7 +18,8 @@ export default function PricesTab({ products, onEdit }) {
       return a.name.localeCompare(b.name);
     });
 
-  const totalInventoryValue = products.reduce((a, p) => a + (p.stock_available ?? 0) * (Number(p.purchase_price) || 0), 0);
+  const totalInventoryValue     = products.reduce((a, p) => a + (p.stock_available ?? 0) * (Number(p.purchase_price) || 0), 0);
+  const totalInventorySaleValue = products.reduce((a, p) => a + (p.stock_available ?? 0) * (Number(p.sale_price) || 0), 0);
   const avgMargin = products.length > 0
     ? Math.round(products.reduce((a, p) => a + getMargin(p.purchase_price, p.sale_price), 0) / products.length)
     : 0;
@@ -28,9 +29,10 @@ export default function PricesTab({ products, onEdit }) {
       {/* KPIs precios */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: 'Valor inventario (costo)', value: formatCOP(totalInventoryValue), color: 'from-indigo-400 to-violet-500', icon: '💼' },
-          { label: 'Margen promedio',          value: `${avgMargin}%`,                color: 'from-emerald-400 to-teal-500',  icon: '📈' },
-          { label: 'Productos con precio',     value: products.filter((p) => p.sale_price > 0).length, color: 'from-amber-400 to-yellow-500', icon: '🏷️' },
+          { label: 'Valor inventario (costo)',  value: formatCOP(totalInventoryValue),     color: 'from-indigo-400 to-violet-500',  icon: '💼' },
+          { label: 'Valor inventario (venta)',  value: formatCOP(totalInventorySaleValue), color: 'from-emerald-400 to-teal-500',   icon: '💰' },
+          { label: 'Margen promedio',           value: `${avgMargin}%`,                    color: 'from-violet-400 to-purple-500',  icon: '📈' },
+          { label: 'Productos con precio',      value: products.filter((p) => p.sale_price > 0).length, color: 'from-amber-400 to-yellow-500', icon: '🏷️' },
         ].map((k) => (
           <div key={k.label} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${k.color} flex items-center justify-center text-base flex-shrink-0`}>{k.icon}</div>
@@ -62,23 +64,25 @@ export default function PricesTab({ products, onEdit }) {
 
       {/* Tabla de precios */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="hidden md:grid grid-cols-12 gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-          <div className="col-span-4">Producto</div>
-          <div className="col-span-2 text-right">Costo</div>
+        <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+          <div className="col-span-3">Producto</div>
+          <div className="col-span-1 text-right">Stock</div>
+          <div className="col-span-2 text-right">Costo unit.</div>
           <div className="col-span-2 text-right">Precio venta</div>
-          <div className="col-span-1 text-right">IVA</div>
           <div className="col-span-1 text-right">Margen</div>
-          <div className="col-span-2 text-right">P. con IVA</div>
+          <div className="col-span-3 text-right">Valor en stock</div>
         </div>
         <div className="divide-y divide-gray-100">
           {filtered.map((p) => {
-            const margin    = getMargin(p.purchase_price, p.sale_price);
-            const priceIva  = Number(p.sale_price) * (1 + Number(p.tax_rate ?? 0) / 100);
-            const isGoodMrg = margin >= 30;
-            const isBadMrg  = margin < 10 && margin > 0;
+            const margin      = getMargin(p.purchase_price, p.sale_price);
+            const stockVal    = (p.stock_available ?? 0) * (Number(p.purchase_price) || 0);
+            const stockSaleVal= (p.stock_available ?? 0) * (Number(p.sale_price) || 0);
+            const isGoodMrg   = margin >= 30;
+            const isBadMrg    = margin < 10 && margin > 0;
             return (
-              <div key={p.id} className="grid grid-cols-12 gap-3 px-5 py-3.5 items-center hover:bg-gray-50 transition cursor-pointer" onClick={() => onEdit(p)}>
-                <div className="col-span-8 md:col-span-4 flex items-center gap-3 min-w-0">
+              <div key={p.id} className="grid grid-cols-12 gap-2 px-5 py-3.5 items-center hover:bg-gray-50 transition cursor-pointer" onClick={() => onEdit(p)}>
+                {/* Nombre */}
+                <div className="col-span-8 md:col-span-3 flex items-center gap-3 min-w-0">
                   {p.photo_url
                     ? <img src={p.photo_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                     : <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 font-bold text-xs flex items-center justify-center flex-shrink-0">{p.name?.[0]}</div>
@@ -88,15 +92,23 @@ export default function PricesTab({ products, onEdit }) {
                     {p.sku && <p className="text-[10px] text-gray-400">SKU: {p.sku}</p>}
                   </div>
                 </div>
-                <div className="hidden md:block col-span-2 text-right text-xs text-gray-500">{formatCOP(p.purchase_price)}</div>
-                <div className="hidden md:block col-span-2 text-right font-bold text-gray-900 text-sm">{formatCOP(p.sale_price)}</div>
-                <div className="hidden md:block col-span-1 text-right text-xs text-gray-400">{p.tax_rate ?? 0}%</div>
-                <div className="hidden md:block col-span-1 text-right">
-                  <span className={`text-xs font-bold ${isGoodMrg ? 'text-emerald-600' : isBadMrg ? 'text-red-500' : 'text-gray-600'}`}>
-                    {margin}%
-                  </span>
+                {/* Stock disponible */}
+                <div className="hidden md:block col-span-1 text-right text-xs font-semibold text-gray-700">
+                  {p.stock_available ?? 0} <span className="text-gray-400 font-normal">{p.unit}</span>
                 </div>
-                <div className="col-span-4 md:col-span-2 text-right text-sm font-extrabold text-indigo-600">{formatCOP(priceIva)}</div>
+                {/* Costo unitario */}
+                <div className="hidden md:block col-span-2 text-right text-xs text-gray-500">{formatCOP(p.purchase_price)}</div>
+                {/* Precio venta */}
+                <div className="hidden md:block col-span-2 text-right font-bold text-gray-900 text-sm">{formatCOP(p.sale_price)}</div>
+                {/* Margen */}
+                <div className="hidden md:block col-span-1 text-right">
+                  <span className={`text-xs font-bold ${isGoodMrg ? 'text-emerald-600' : isBadMrg ? 'text-red-500' : 'text-gray-600'}`}>{margin}%</span>
+                </div>
+                {/* Valor en stock (costo + venta) */}
+                <div className="col-span-4 md:col-span-3 text-right">
+                  <p className="text-sm font-extrabold text-indigo-600">{formatCOP(stockVal)}</p>
+                  <p className="text-[10px] text-emerald-600 font-medium">{formatCOP(stockSaleVal)} venta</p>
+                </div>
               </div>
             );
           })}

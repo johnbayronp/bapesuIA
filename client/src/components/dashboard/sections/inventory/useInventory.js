@@ -80,6 +80,7 @@ export function useInventory() {
       stock_in_transit: p.stock_in_transit ?? 0,
       stock_min:        p.stock_min ?? 0,
       stock_location:   p.stock_location ?? '',
+      supplier_id:      p.supplier_id ?? '',
       purchase_price:   String(p.purchase_price ?? ''),
       sale_price:       String(p.sale_price ?? ''),
       tax_rate:         p.tax_rate ?? 19,
@@ -108,6 +109,7 @@ export function useInventory() {
         stock_in_transit: Number(productForm.stock_in_transit) || 0,
         stock_min:        Number(productForm.stock_min)        || 0,
         stock_location:   productForm.stock_location.trim() || null,
+        supplier_id:      productForm.supplier_id || null,
         purchase_price:   parseFloat(String(productForm.purchase_price).replace(/\./g,'').replace(/,/g,'')) || 0,
         sale_price:       parseFloat(String(productForm.sale_price).replace(/\./g,'').replace(/,/g,''))     || 0,
         tax_rate:         Number(productForm.tax_rate) || 19,
@@ -192,17 +194,17 @@ export function useInventory() {
   const closeStockModal = () => { setStockModal(null); setError(''); };
 
   const handleSaveStock = async () => {
-    const qty = parseInt(stockForm.quantity);
+    const qty = parseFloat(stockForm.quantity);
     if (!qty || qty <= 0) { setError('Ingresa una cantidad válida'); return; }
     setSaving(true); setError('');
     try {
       const p        = stockModal;
-      const current  = p.stock_available ?? 0;
+      const current  = Number(p.stock_available) || 0;
       const newStock = stockForm.type === 'entrada'
-        ? current + qty
+        ? +((current + qty).toFixed(3))
         : stockForm.type === 'salida'
-        ? Math.max(current - qty, 0)
-        : qty; // ajuste directo
+        ? Math.max(+((current - qty).toFixed(3)), 0)
+        : +qty.toFixed(3); // ajuste directo
 
       await supabase.from('bapesu_products').update({ stock_available: newStock, updated_at: new Date().toISOString() }).eq('id', p.id);
       await supabase.from('bapesu_stock_movements').insert({
