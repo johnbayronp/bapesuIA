@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import { operationsApi, inventoryApi } from '../../../../api';
+import { db } from '../../../../api/db';
 import { useCompany } from '../../../../context/CompanyContext';
+
+// Alias para queries puntuales que no justifican un método en la capa api aún
+const supabase = db;
 
 const PREFIX = { entrada: 'ENT', salida: 'SAL', traslado: 'TRF', conteo: 'CNT' };
 
@@ -52,19 +56,14 @@ export function useOperations() {
     const [opsRes, suppRes, whRes, invRes, facRes] = await Promise.all([
       supabase
         .from('bapesu_inventory_ops')
-        .select(`
-          *,
-          bapesu_suppliers(name),
-          wh_from:bapesu_warehouses!bapesu_inventory_ops_warehouse_from_fkey(name),
-          wh_to:bapesu_warehouses!bapesu_inventory_ops_warehouse_to_fkey(name)
-        `)
+        .select(`*, bapesu_suppliers(name), wh_from:bapesu_warehouses!bapesu_inventory_ops_warehouse_from_fkey(name), wh_to:bapesu_warehouses!bapesu_inventory_ops_warehouse_to_fkey(name)`)
         .eq('company_id', company.id)
         .order('op_date', { ascending: false })
         .limit(200),
-      supabase.from('bapesu_suppliers').select('id,name,nit,contact,email,phone,address,notes').eq('company_id', company.id).eq('is_active', true).order('name'),
-      supabase.from('bapesu_warehouses').select('id,name,address,description').eq('company_id', company.id).eq('is_active', true).order('name'),
-      supabase.from('bapesu_invoices').select('id,number,client_name,total,status').eq('company_id', company.id).in('status', ['draft','sent']).order('created_at', { ascending: false }).limit(100),
-      supabase.from('bapesu_facturas').select('id,prefix,number,client_name,total,status').eq('company_id', company.id).in('status', ['draft','sent']).order('created_at', { ascending: false }).limit(100),
+      operationsApi.listSuppliers(company.id),
+      operationsApi.listWarehouses(company.id),
+      operationsApi.listPendingInvoices(company.id),
+      operationsApi.listPendingFacturas(company.id),
     ]);
     setOps(opsRes.data  ?? []);
     setSuppliers(suppRes.data ?? []);

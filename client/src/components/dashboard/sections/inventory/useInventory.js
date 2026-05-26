@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import { inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
 import { EMPTY_PRODUCT, EMPTY_CATEGORY } from './constants';
 
@@ -29,22 +29,9 @@ export function useInventory() {
     if (!company?.id) return;
     setLoading(true);
     const [prod, cat, mov] = await Promise.all([
-      supabase
-        .from('bapesu_products')
-        .select('*, bapesu_inventory_categories(id,name,color)')
-        .eq('company_id', company.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('bapesu_inventory_categories')
-        .select('*')
-        .eq('company_id', company.id)
-        .order('name'),
-      supabase
-        .from('bapesu_stock_movements')
-        .select('*, bapesu_products(name)')
-        .eq('company_id', company.id)
-        .order('created_at', { ascending: false })
-        .limit(100),
+      inventoryApi.listProducts(company.id),
+      inventoryApi.listCategories(company.id),
+      inventoryApi.listMovements(company.id),
     ]);
     setProducts(prod.data  ?? []);
     setCategories(cat.data ?? []);
@@ -116,12 +103,10 @@ export function useInventory() {
         updated_at:       new Date().toISOString(),
       };
       if (productModal.mode === 'add') {
-        const { error: e } = await supabase
-          .from('bapesu_products')
-          .insert({ ...payload, company_id: company.id, created_by: user?.id ?? null });
+        const { error: e } = await inventoryApi.createProduct({ ...payload, company_id: company.id, created_by: user?.id ?? null });
         if (e) throw e;
       } else {
-        const { error: e } = await supabase.from('bapesu_products').update(payload).eq('id', productModal.id);
+        const { error: e } = await inventoryApi.updateProduct(productModal.id, payload);
         if (e) throw e;
       }
       await load();
@@ -133,13 +118,13 @@ export function useInventory() {
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('¿Eliminar este producto?')) return;
     setDeleting(id);
-    await supabase.from('bapesu_products').delete().eq('id', id);
+    await inventoryApi.deleteProduct(id);
     await load();
     setDeleting(null);
   };
 
   const handleToggleProduct = async (p) => {
-    await supabase.from('bapesu_products').update({ is_active: !p.is_active }).eq('id', p.id);
+    await inventoryApi.updateProduct(p.id, { is_active: !p.is_active });
     await load();
   };
 
@@ -167,10 +152,10 @@ export function useInventory() {
         parent_id:   categoryForm.parent_id || null,
       };
       if (categoryModal.mode === 'add') {
-        const { error: e } = await supabase.from('bapesu_inventory_categories').insert({ ...payload, company_id: company.id });
+        const { error: e } = await inventoryApi.createCategory({ ...payload, company_id: company.id });
         if (e) throw e;
       } else {
-        const { error: e } = await supabase.from('bapesu_inventory_categories').update(payload).eq('id', categoryModal.id);
+        const { error: e } = await inventoryApi.updateCategory(categoryModal.id, payload);
         if (e) throw e;
       }
       await load();
@@ -181,7 +166,7 @@ export function useInventory() {
 
   const handleDeleteCategory = async (id) => {
     if (!window.confirm('¿Eliminar esta categoría? Los productos vinculados quedarán sin categoría.')) return;
-    await supabase.from('bapesu_inventory_categories').delete().eq('id', id);
+    await inventoryApi.deleteCategory(id);
     await load();
   };
 
@@ -206,8 +191,8 @@ export function useInventory() {
         ? Math.max(+((current - qty).toFixed(3)), 0)
         : +qty.toFixed(3); // ajuste directo
 
-      await supabase.from('bapesu_products').update({ stock_available: newStock, updated_at: new Date().toISOString() }).eq('id', p.id);
-      await supabase.from('bapesu_stock_movements').insert({
+      await inventoryApi.updateProduct(p.id, { stock_available: newStock, updated_at: new Date().toISOString() });
+      await inventoryApi.addMovement({
         company_id: company.id,
         product_id: p.id,
         type:       stockForm.type,

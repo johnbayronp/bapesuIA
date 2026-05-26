@@ -149,12 +149,20 @@ export default function CobrosModule() {
   });
 
   // KPIs unificados (ambos tabs)
+  const today     = new Date().toISOString().slice(0, 10);
   const allDocs   = [...invoices, ...facturas];
-  const totalPaid = allDocs.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
-  const totalPend = allDocs.filter((d) => ['draft', 'sent'].includes(d.status)).reduce((a, d) => a + Number(d.total || 0), 0);
 
-  const tabPaid = list.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
-  const tabPend = list.filter((d) => ['draft', 'sent'].includes(d.status)).reduce((a, d) => a + Number(d.total || 0), 0);
+  const totalPaid     = allDocs.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
+  // Enviadas con fecha de vence futura o sin fecha → por cobrar vigente
+  const totalPend     = allDocs.filter((d) => d.status === 'sent' && (!d.due_date || d.due_date >= today)).reduce((a, d) => a + Number(d.total || 0), 0);
+  // Enviadas con fecha de vence pasada → cartera vencida
+  const totalOverdue  = allDocs.filter((d) => d.status === 'sent' && d.due_date && d.due_date < today).reduce((a, d) => a + Number(d.total || 0), 0);
+  // Borradores sin enviar
+  const totalDraft    = allDocs.filter((d) => d.status === 'draft').reduce((a, d) => a + Number(d.total || 0), 0);
+
+  const tabPaid    = list.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
+  const tabPend    = list.filter((d) => d.status === 'sent' && (!d.due_date || d.due_date >= today)).reduce((a, d) => a + Number(d.total || 0), 0);
+  const tabOverdue = list.filter((d) => d.status === 'sent' && d.due_date && d.due_date < today).reduce((a, d) => a + Number(d.total || 0), 0);
 
   const accentBtn = activeTab === 'invoices'
     ? 'from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 shadow-[0_4px_16px_rgba(16,185,129,0.3)]'
@@ -182,21 +190,72 @@ export default function CobrosModule() {
         </Link>
       </div>
 
-      {/* KPIs globales */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      {/* KPIs globales — fila 1: métricas financieras */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         {[
-          { label: 'Total cobrado', value: formatCOP(totalPaid), icon: '✅', color: 'from-emerald-400 to-teal-500' },
-          { label: 'Por cobrar',    value: formatCOP(totalPend), icon: '⏳', color: 'from-yellow-400 to-amber-500' },
-          { label: 'Cuentas cobro', value: invoices.length,      icon: '🧾', color: 'from-emerald-300 to-teal-400' },
-          { label: 'Facturas',      value: facturas.length,      icon: '📄', color: 'from-violet-400 to-indigo-500' },
+          {
+            label: 'Cobrado',
+            sub: 'Documentos pagados',
+            value: formatCOP(totalPaid),
+            icon: '✅',
+            valueColor: 'text-emerald-600',
+            border: 'border-emerald-100',
+            iconBg: 'from-emerald-400 to-teal-500',
+          },
+          {
+            label: 'Por cobrar',
+            sub: 'Enviadas y vigentes',
+            value: formatCOP(totalPend),
+            icon: '🟡',
+            valueColor: 'text-amber-600',
+            border: 'border-amber-100',
+            iconBg: 'from-yellow-400 to-amber-500',
+          },
+          {
+            label: 'Vencido',
+            sub: 'Enviadas, fecha pasada',
+            value: formatCOP(totalOverdue),
+            icon: '⏳',
+            valueColor: totalOverdue > 0 ? 'text-red-600' : 'text-gray-400',
+            border: totalOverdue > 0 ? 'border-red-100' : 'border-gray-100',
+            iconBg: totalOverdue > 0 ? 'from-red-400 to-rose-500' : 'from-gray-300 to-gray-400',
+          },
+          {
+            label: 'Borradores',
+            sub: 'Sin enviar al cliente',
+            value: formatCOP(totalDraft),
+            icon: '📄',
+            valueColor: 'text-gray-500',
+            border: 'border-gray-100',
+            iconBg: 'from-gray-300 to-gray-400',
+          },
         ].map((k) => (
-          <div key={k.label} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${k.color} flex items-center justify-center text-base flex-shrink-0`}>
+          <div key={k.label} className={`bg-white border ${k.border} rounded-2xl p-4 shadow-sm flex items-center gap-3`}>
+            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${k.iconBg} flex items-center justify-center text-base flex-shrink-0`}>
               {k.icon}
             </div>
             <div className="min-w-0">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide">{k.label}</p>
-              <p className="text-base font-extrabold text-gray-900 truncate">{k.value}</p>
+              <p className={`text-base font-extrabold truncate ${k.valueColor}`}>{k.value}</p>
+              <p className="text-[10px] text-gray-400 truncate">{k.sub}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* KPIs globales — fila 2: conteo de documentos */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {[
+          { label: 'Cuentas de cobro', value: invoices.length, icon: '🧾', color: 'from-emerald-300 to-teal-400', valueColor: 'text-teal-700' },
+          { label: 'Facturas',         value: facturas.length, icon: '📑', color: 'from-violet-400 to-indigo-500', valueColor: 'text-violet-700' },
+        ].map((k) => (
+          <div key={k.label} className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${k.color} flex items-center justify-center text-sm flex-shrink-0`}>
+              {k.icon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">{k.label}</p>
+              <p className={`text-base font-extrabold ${k.valueColor}`}>{k.value} <span className="text-xs font-normal text-gray-400">documentos</span></p>
             </div>
           </div>
         ))}
@@ -234,19 +293,26 @@ export default function CobrosModule() {
       </div>
 
       {/* Stats del tab activo */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
           <div className={`w-2 h-8 rounded-full ${activeTab === 'invoices' ? 'bg-emerald-500' : 'bg-violet-500'}`} />
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pagado ({tab.label})</p>
-            <p className={`text-lg font-extrabold ${activeTab === 'invoices' ? 'text-emerald-600' : 'text-violet-600'}`}>{formatCOP(tabPaid)}</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Pagado</p>
+            <p className={`text-base font-extrabold ${activeTab === 'invoices' ? 'text-emerald-600' : 'text-violet-600'}`}>{formatCOP(tabPaid)}</p>
           </div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
+        <div className="bg-white border border-amber-100 rounded-xl p-3 shadow-sm flex items-center gap-3">
           <div className="w-2 h-8 rounded-full bg-amber-400" />
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Por cobrar ({tab.label})</p>
-            <p className="text-lg font-extrabold text-amber-600">{formatCOP(tabPend)}</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Por cobrar</p>
+            <p className="text-base font-extrabold text-amber-600">{formatCOP(tabPend)}</p>
+          </div>
+        </div>
+        <div className={`bg-white border rounded-xl p-3 shadow-sm flex items-center gap-3 ${tabOverdue > 0 ? 'border-red-100' : 'border-gray-200'}`}>
+          <div className={`w-2 h-8 rounded-full ${tabOverdue > 0 ? 'bg-red-400' : 'bg-gray-300'}`} />
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide">Vencido</p>
+            <p className={`text-base font-extrabold ${tabOverdue > 0 ? 'text-red-600' : 'text-gray-400'}`}>{formatCOP(tabOverdue)}</p>
           </div>
         </div>
       </div>
@@ -296,7 +362,7 @@ export default function CobrosModule() {
             <div className="col-span-2">Número</div>
             <div className="col-span-2">Cliente</div>
             <div className="col-span-2">Emisión</div>
-            <div className="col-span-1">Vence</div>
+            <div className="col-span-1">Vence / Días</div>
             <div className="col-span-1">Estado</div>
             <div className="col-span-1 text-right">Total</div>
             <div className="col-span-3 text-right">Acciones</div>
@@ -311,7 +377,10 @@ export default function CobrosModule() {
               const numLabel = activeTab === 'invoices'
                 ? `#${doc.number ?? '—'}`
                 : `${doc.prefix ?? 'FAC'}-${doc.number ?? '—'}`;
-              const overdue = doc.status === 'sent' && doc.due_date && doc.due_date < new Date().toISOString().slice(0, 10);
+              const overdue = doc.status === 'sent' && doc.due_date && doc.due_date < today;
+              const overdueDays = overdue
+                ? Math.floor((new Date(today) - new Date(doc.due_date + 'T12:00:00')) / 86400000)
+                : 0;
 
               return (
                 <div
@@ -329,9 +398,15 @@ export default function CobrosModule() {
                   <div className="hidden md:block col-span-2 text-xs text-gray-500">
                     {doc.issue_date ? new Date(doc.issue_date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </div>
-                  <div className={`hidden md:block col-span-1 text-xs ${overdue ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                    {doc.due_date ? new Date(doc.due_date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}
-                    {overdue && <span className="ml-0.5">⚠</span>}
+                  <div className="hidden md:block col-span-1">
+                    <p className={`text-xs ${overdue ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                      {doc.due_date ? new Date(doc.due_date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}
+                    </p>
+                    {overdue && (
+                      <span className="inline-block mt-0.5 text-[10px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full leading-none">
+                        {overdueDays}d vencido
+                      </span>
+                    )}
                   </div>
                   <div className="col-span-3 md:col-span-1">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.bg} ${st.text}`}>
