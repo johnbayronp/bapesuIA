@@ -20,7 +20,8 @@ const STATUS_QUOTE = {
   rejected: { label: 'Rechazada', color: 'bg-red-100 text-red-600' },
 };
 
-function StatCard({ label, value, sub, icon, color = 'yellow' }) {
+function StatCard({ label, value, sub, icon, color = 'yellow', info }) {
+  const [showInfo, setShowInfo] = React.useState(false);
   const colors = {
     yellow:  'from-yellow-400 to-amber-500',
     emerald: 'from-emerald-400 to-teal-500',
@@ -30,15 +31,36 @@ function StatCard({ label, value, sub, icon, color = 'yellow' }) {
     gray:    'from-gray-300 to-gray-400',
   };
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex items-start gap-4">
+    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex items-start gap-4 relative">
       <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${colors[color]} flex items-center justify-center flex-shrink-0 shadow-sm`}>
         <span className="text-white">{icon}</span>
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-xs text-gray-500 font-medium">{label}</p>
         <p className="text-2xl font-extrabold text-gray-900 mt-0.5 truncate">{value}</p>
         {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
       </div>
+      {info && (
+        <div className="relative flex-shrink-0">
+          <button
+            onMouseEnter={() => setShowInfo(true)}
+            onMouseLeave={() => setShowInfo(false)}
+            onClick={() => setShowInfo((v) => !v)}
+            className="w-5 h-5 rounded-full flex items-center justify-center text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition"
+            aria-label="Más información"
+          >
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </button>
+          {showInfo && (
+            <div className="absolute right-0 top-7 z-50 w-56 bg-gray-900 text-white text-[11px] leading-relaxed rounded-xl px-3 py-2.5 shadow-xl pointer-events-none">
+              {info}
+              <div className="absolute -top-1.5 right-2 w-3 h-3 bg-gray-900 rotate-45 rounded-sm" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -295,21 +317,25 @@ export default function Analytics() {
         <StatCard label="Ingresos cobrados" value={formatCOP(totalRevenue)}
           sub={`${paidDocs.length} documento${paidDocs.length !== 1 ? 's' : ''} pagado${paidDocs.length !== 1 ? 's' : ''}`}
           color="emerald"
+          info="Suma total de todas las cuentas de cobro y facturas con estado Pagada. Representa el dinero que ya entró a tu caja."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
         />
         <StatCard label="Por cobrar (vigente)" value={formatCOP(pendingRevenue)}
           sub="Enviadas, sin vencer"
           color="yellow"
+          info="Documentos enviados al cliente cuya fecha de vencimiento aún no ha llegado. Es el dinero que esperas recibir próximamente."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
         />
         <StatCard label="Cartera vencida" value={formatCOP(overdueRevenue)}
           sub={overdueCount > 0 ? `${overdueCount} documento${overdueCount > 1 ? 's' : ''} sin pagar` : 'Sin vencimientos'}
           color={overdueRevenue > 0 ? 'rose' : 'indigo'}
+          info="Documentos enviados cuya fecha de vencimiento ya pasó y aún no han sido pagados. Si crece mes a mes, hay un problema de flujo de caja."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
         />
         <StatCard label="Tasa de conversión" value={`${conversionRate}%`}
           sub={`${acceptedQuotes.length} de ${quotations.length} cotizaciones`}
           color="indigo"
+          info="Porcentaje de cotizaciones que terminaron siendo aceptadas por el cliente. Una tasa alta indica que tus propuestas están bien ajustadas al mercado."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
         />
       </div>
@@ -318,6 +344,7 @@ export default function Analytics() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Ticket promedio" value={paidDocs.length > 0 ? formatCOP(ticketAvg) : '—'}
           sub={ticketSub} color="indigo"
+          info="Valor promedio de cada cobro pagado. Útil para entender el tamaño típico de tus trabajos. Se vuelve representativo a partir de 3 pagos."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
         />
         <StatCard
@@ -325,16 +352,19 @@ export default function Analytics() {
           value={avgPayDays !== null ? `${avgPayDays} días` : '—'}
           sub={avgPayDays !== null ? `Desde emisión hasta cobro · ${payDays.length} docs` : 'Sin pagos registrados'}
           color={avgPayDays !== null && avgPayDays > 30 ? 'rose' : 'emerald'}
+          info="Promedio de días que tarda un cliente en pagarte desde que emites el documento. Menos de 15 días es excelente. Más de 30 días puede afectar tu flujo de caja."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
         />
         <StatCard label="Clientes" value={clients.length}
           sub={`+${newClientsThisMonth} este mes · ${services.filter((s) => s.is_active).length} servicios activos`}
           color="rose"
+          info="Total de clientes registrados en tu empresa. El número entre paréntesis muestra los nuevos clientes agregados este mes."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
         />
         <StatCard label="Borradores" value={formatCOP(draftRevenue)}
           sub={`${allDocs.filter((d) => d.status === 'draft').length} sin enviar`}
           color="yellow"
+          info="Valor total de documentos creados pero aún no enviados al cliente. Son ingresos pendientes de gestionar — recuerda enviarlos."
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
         />
       </div>
@@ -343,17 +373,21 @@ export default function Analytics() {
       {hasInventory && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Productos activos" value={activeProducts.length} sub={`${products.length} en total`} color="indigo"
+            info="Cantidad de productos marcados como activos en tu inventario. Los inactivos no aparecen en operaciones ni cotizaciones."
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>}
           />
           <StatCard label="Stock bajo" value={lowStockProducts.length}
             sub={lowStockProducts.length > 0 ? lowStockProducts.slice(0,2).map(p=>p.name).join(', ') : 'Todo en orden'}
             color={lowStockProducts.length > 0 ? 'rose' : 'emerald'}
+            info="Productos cuyo stock disponible es igual o menor al stock mínimo configurado. Necesitan reabastecimiento pronto."
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
           />
           <StatCard label="Valor a costo" value={formatCOP(inventoryValueCost)} sub="Precio compra × stock" color="yellow"
+            info="Cuánto te costó comprar el inventario que tienes actualmente. Es el capital invertido en mercancía o insumos."
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>}
           />
           <StatCard label="Valor a venta" value={formatCOP(inventoryValueSale)} sub="Precio venta × stock" color="emerald"
+            info="Cuánto valdría tu inventario actual si vendieras todo al precio de venta. La diferencia con el valor a costo es tu margen bruto potencial."
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
           />
         </div>

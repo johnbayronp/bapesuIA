@@ -42,7 +42,7 @@ export const inventoryApi = {
   // ── Movimientos de stock ─────────────────────────────────────────
   listMovements: (companyId, limit = 100) =>
     db.from('bapesu_stock_movements')
-      .select('*, bapesu_products(name)')
+      .select('*, bapesu_products(name,unit)')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(limit),
