@@ -107,7 +107,7 @@ export default function Analytics() {
       supabase.from('bapesu_services').select('id,name,default_price,is_active').eq('company_id', company.id),
       supabase.from('bapesu_products').select('id,name,stock_available,stock_min,purchase_price,sale_price,is_active').eq('company_id', company.id),
       supabase.from('bapesu_stock_movements')
-        .select('quantity,type,bapesu_products(purchase_price)')
+        .select('quantity,type,bapesu_products!product_id(purchase_price)')
         .eq('company_id', company.id)
         .eq('type', 'salida')
         .gte('created_at', thisMonthStart),
@@ -149,19 +149,24 @@ export default function Analytics() {
     ? `Basado en ${paidDocs.length} pago${paidDocs.length > 1 ? 's' : ''} — poco representativo`
     : `Basado en ${paidDocs.length} pagos`;
 
-  // Ingresos y costo este mes
+  // Ingresos este mes — usa issue_date para evitar que updated_at (ediciones) distorsione el período
   const revenueThisMonth = paidDocs
-    .filter((d) => (d.updated_at ?? d.issue_date)?.slice(0, 7) === thisMonth)
+    .filter((d) => d.issue_date?.slice(0, 7) === thisMonth)
     .reduce((a, d) => a + Number(d.total), 0);
-  const costThisMonth = movements.reduce((m, mv) => {
-    const price = Number(mv.bapesu_products?.purchase_price || 0);
-    return m + Math.abs(Number(mv.quantity)) * price;
+
+  // Costo de insumos: salidas de inventario confirmadas este mes con precio de costo del producto
+  const costThisMonth = movements.reduce((acc, mv) => {
+    const price = Number(mv.bapesu_products?.purchase_price ?? 0);
+    const qty   = Math.abs(Number(mv.quantity ?? 0));
+    return acc + qty * price;
   }, 0);
   const profitThisMonth = revenueThisMonth - costThisMonth;
 
-  // Días promedio de pago (issue_date → updated_at en pagados)
+  // Días promedio de pago: diferencia en días entre issue_date y updated_at en docs pagados.
+  // updated_at es la mejor aproximación disponible a "fecha de cobro" (se actualiza al cambiar status a paid).
+  // Se excluyen docs con updated_at == issue_date (sin actualizar desde creación) para evitar 0s falsos.
   const payDays = paidDocs
-    .filter((d) => d.issue_date && d.updated_at)
+    .filter((d) => d.issue_date && d.updated_at && d.updated_at.slice(0, 10) !== d.issue_date)
     .map((d) => Math.max(0, Math.floor((new Date(d.updated_at) - new Date(d.issue_date + 'T12:00:00')) / 86400000)));
   const avgPayDays = payDays.length > 0 ? Math.round(payDays.reduce((a, v) => a + v, 0) / payDays.length) : null;
 
