@@ -7,10 +7,14 @@ import DashHome from './sections/DashHome';
 import ClientsManager from './sections/ClientsManager';
 import UsersManager from './sections/UsersManager';
 import CompanySettings from './sections/CompanySettings';
-import ServicesManager from './sections/ServicesManager';
+import ServicesManager from './sections/services';
+import Analytics from './sections/Analytics';
+import Reminders from './sections/Reminders';
+import InventoryModule from './sections/inventory';
+import CobrosModule from './sections/CobrosModule';
+import FacturaEditor from './sections/FacturaEditor';
 import QuotationsList from './sections/QuotationsList';
 import QuotationEditor from './sections/QuotationEditor';
-import InvoicesList from './sections/InvoicesList';
 import InvoiceEditor from './sections/InvoiceEditor';
 
 const NAV = [
@@ -48,9 +52,57 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    id: 'analytics',
+    label: 'Analíticas',
+    href: '/dashboard/analytics',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'reminders',
+    label: 'Recordatorios',
+    href: '/dashboard/reminders',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+    ),
+  },
 ];
 
 const BIZ = [
+  {
+    id: 'inventory',
+    label: 'Inventario',
+    href: '/dashboard/inventory',
+    accent: 'text-indigo-600',
+    activeBg: 'bg-indigo-50 text-indigo-700',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'cobros',
+    label: 'Cobros',
+    href: '/dashboard/cobros',
+    accent: 'text-emerald-600',
+    activeBg: 'bg-emerald-50 text-emerald-700',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M9 12h6m-6 4h6m-7 4h8a2 2 0 002-2V6a2 2 0 00-2-2h-8a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
   {
     id: 'quotations',
     label: 'Cotizaciones',
@@ -61,19 +113,6 @@ const BIZ = [
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
-    ),
-  },
-  {
-    id: 'invoices',
-    label: 'Cuentas de cobro',
-    href: '/dashboard/invoices',
-    accent: 'text-emerald-600',
-    activeBg: 'bg-emerald-50 text-emerald-700',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-          d="M9 12h6m-6 4h6m-7 4h8a2 2 0 002-2V6a2 2 0 00-2-2h-8a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
   },
@@ -141,7 +180,18 @@ export default function BusinessDashboard() {
       <div className="px-4 py-4 border-b border-gray-200">
         <Link to="/dashboard/company" className="block group">
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 transition">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-gray-900 font-extrabold text-sm flex-shrink-0 shadow-sm">
+            {company?.logo_url ? (
+              <img
+                src={company.logo_url}
+                alt={company.name}
+                className="w-9 h-9 rounded-lg object-contain bg-white border border-gray-200 shadow-sm flex-shrink-0 p-0.5"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+              />
+            ) : null}
+            <div
+              className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-500 items-center justify-center text-gray-900 font-extrabold text-sm flex-shrink-0 shadow-sm"
+              style={{ display: company?.logo_url ? 'none' : 'flex' }}
+            >
               {company?.name?.[0]?.toUpperCase() ?? 'E'}
             </div>
             <div className="flex-1 min-w-0">
@@ -282,7 +332,9 @@ export default function BusinessDashboard() {
           </button>
 
           <div className="hidden md:flex items-center gap-2 text-sm text-gray-600 font-medium">
-            {[...NAV, ...BIZ, ...ADMIN].find((n) => isActive(n.href, n.exact))?.label ?? 'Dashboard'}
+            {[...NAV, ...BIZ, ...ADMIN].find((n) =>
+              n.exact ? location.pathname === n.href : location.pathname.startsWith(n.href)
+            )?.label ?? 'Dashboard'}
           </div>
 
           <div className="flex items-center gap-3">
@@ -304,14 +356,20 @@ export default function BusinessDashboard() {
             <Route path="/" element={<DashHome />} />
             <Route path="/clients" element={<ClientsManager />} />
             <Route path="/services" element={<ServicesManager />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/reminders" element={<Reminders />} />
+            <Route path="/inventory" element={<InventoryModule />} />
+
+            {/* Módulo unificado Cobros */}
+            <Route path="/cobros" element={<CobrosModule />} />
+            <Route path="/cobros/invoices/new" element={<InvoiceEditor />} />
+            <Route path="/cobros/invoices/:id" element={<InvoiceEditor />} />
+            <Route path="/cobros/facturas/new" element={<FacturaEditor />} />
+            <Route path="/cobros/facturas/:id" element={<FacturaEditor />} />
 
             <Route path="/quotations" element={<QuotationsList />} />
             <Route path="/quotations/new" element={<QuotationEditor />} />
             <Route path="/quotations/:id" element={<QuotationEditor />} />
-
-            <Route path="/invoices" element={<InvoicesList />} />
-            <Route path="/invoices/new" element={<InvoiceEditor />} />
-            <Route path="/invoices/:id" element={<InvoiceEditor />} />
 
             <Route path="/users" element={<UsersManager />} />
             <Route path="/company" element={<CompanySettings />} />

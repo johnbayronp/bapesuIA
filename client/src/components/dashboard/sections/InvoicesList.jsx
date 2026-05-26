@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { useCompany } from '../../../context/CompanyContext';
 
+const FACTURA_PREFIX = 'FAC';
+
 const formatCOP = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0,
 }).format(n || 0);
@@ -42,6 +44,84 @@ export default function InvoicesList() {
     await supabase.from('bapesu_invoices').delete().eq('id', id);
     await load();
     setDeleting(null);
+  };
+
+  const handleConvertToFactura = async (inv, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`¿Convertir la cuenta de cobro #${inv.number} a factura?\nSe creará una nueva factura pre-llenada con los mismos datos.`)) return;
+
+    try {
+      // Obtener ítems de la cuenta de cobro
+      const { data: items } = await supabase
+        .from('bapesu_invoice_items')
+        .select('*')
+        .eq('invoice_id', inv.id)
+        .order('position');
+
+      // Calcular número de la nueva factura
+      const { count } = await supabase
+        .from('bapesu_facturas')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', company.id);
+      const newNumber = String((count ?? 0) + 1).padStart(3, '0');
+
+      // Crear la factura con los datos de la cuenta de cobro
+      const { data: newFac, error } = await supabase
+        .from('bapesu_facturas')
+        .insert({
+          company_id:         company.id,
+          client_id:          inv.client_id,
+          client_name:        inv.client_name,
+          client_nit:         inv.client_nit,
+          client_email:       inv.client_email,
+          client_phone:       inv.client_phone,
+          client_address:     inv.client_address,
+          prefix:             FACTURA_PREFIX,
+          number:             newNumber,
+          issue_date:         inv.issue_date,
+          due_date:           inv.due_date,
+          concept:            inv.concept,
+          notes:              inv.notes,
+          payment_info:       inv.payment_info,
+          include_iva:        inv.include_iva,
+          iva_rate:           inv.iva_rate,
+          include_retefuente: inv.include_retefuente,
+          retefuente_rate:    inv.retefuente_rate,
+          include_reteiva:    false,
+          reteiva_rate:       15,
+          include_reteica:    false,
+          reteica_rate:       0.414,
+          subtotal:           inv.subtotal,
+          iva_amount:         inv.iva_amount,
+          retefuente_amount:  inv.retefuente_amount,
+          reteiva_amount:     0,
+          reteica_amount:     0,
+          total:              inv.total,
+          status:             'draft',
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      // Copiar ítems
+      if (items?.length) {
+        await supabase.from('bapesu_factura_items').insert(
+          items.map((it) => ({
+            factura_id:  newFac.id,
+            service_id:  it.service_id,
+            description: it.description,
+            quantity:    it.quantity,
+            price:       it.price,
+            position:    it.position,
+          }))
+        );
+      }
+
+      navigate(`/dashboard/facturacion/${newFac.id}`);
+    } catch (err) {
+      alert('Error al convertir: ' + (err.message ?? 'intenta de nuevo'));
+    }
   };
 
   const handleDuplicate = async (q, e) => {
@@ -192,6 +272,17 @@ export default function InvoicesList() {
                     <p className="text-[11px] text-gray-400 mr-1 hidden md:block">
                       {q.created_at ? new Date(q.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : ''}
                     </p>
+                    {q.status === 'paid' && (
+                      <button
+                        onClick={(e) => handleConvertToFactura(q, e)}
+                        title="Convertir a factura"
+                        className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 flex items-center justify-center transition"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l2 2 4-4M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    )}
                     <button onClick={(e) => handleDuplicate(q, e)} title="Duplicar" className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
