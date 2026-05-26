@@ -172,7 +172,7 @@ export default function InvoiceEditor() {
         if (e) throw e;
       }
 
-      if (!isEdit) navigate(`/dashboard/invoices/${invoiceId}`, { replace: true });
+      if (!isEdit) navigate(`/dashboard/cobros/invoices/${invoiceId}`, { replace: true });
       else await loadInv();
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
@@ -202,7 +202,7 @@ export default function InvoiceEditor() {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap no-print">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard/invoices')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
+          <button onClick={() => navigate('/dashboard/cobros?tab=invoices')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

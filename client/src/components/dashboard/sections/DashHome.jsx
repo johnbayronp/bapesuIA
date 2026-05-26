@@ -20,7 +20,7 @@ const TOOLS = [
   {
     title: 'Nueva cuenta de cobro',
     desc: 'Cuenta de cobro con IVA, retefuente y datos del cliente registrado.',
-    href: '/dashboard/invoices/new',
+    href: '/dashboard/cobros/invoices/new',
     gradient: 'from-emerald-400 to-teal-500',
     iconBg: 'bg-emerald-100',
     icon: (
