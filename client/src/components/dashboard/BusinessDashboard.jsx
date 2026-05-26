@@ -11,6 +11,7 @@ import ServicesManager from './sections/services';
 import Analytics from './sections/Analytics';
 import Reminders from './sections/Reminders';
 import InventoryModule from './sections/inventory';
+import InventoryTestPanel from './sections/inventory/InventoryTestPanel';
 import CobrosModule from './sections/CobrosModule';
 import FacturaEditor from './sections/FacturaEditor';
 import QuotationsList from './sections/QuotationsList';
@@ -359,6 +360,7 @@ export default function BusinessDashboard() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/inventory" element={<InventoryModule />} />
+            <Route path="/inv-test" element={<InventoryTestPanel />} />
 
             {/* Módulo unificado Cobros */}
             <Route path="/cobros" element={<CobrosModule />} />

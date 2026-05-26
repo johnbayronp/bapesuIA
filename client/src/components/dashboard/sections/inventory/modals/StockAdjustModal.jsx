@@ -13,8 +13,8 @@ export default function StockAdjustModal({ product, form, setSF, onSave, onClose
   const st = getStockStatus(product.stock_available, product.stock_min);
 
   const preview = () => {
-    const qty = parseInt(form.quantity) || 0;
-    const cur = product.stock_available ?? 0;
+    const qty = parseFloat(form.quantity) || 0;
+    const cur = Number(product.stock_available) || 0;
     if (form.type === 'entrada') return cur + qty;
     if (form.type === 'salida')  return Math.max(cur - qty, 0);
     return qty;
@@ -76,7 +76,7 @@ export default function StockAdjustModal({ product, form, setSF, onSave, onClose
               <label className={LABEL}>
                 {form.type === 'ajuste' ? 'Nuevo stock total' : 'Cantidad'}
               </label>
-              <input type="number" min="1" className={INPUT} value={form.quantity}
+              <input type="number" min="0.001" step="0.001" className={INPUT} value={form.quantity}
                 onChange={(e) => setSF('quantity', e.target.value)} placeholder="0" autoFocus />
             </div>
 

@@ -1,19 +1,25 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInventory } from './useInventory';
+import { useOperations } from './useOperations';
 import ProductsTab   from './tabs/ProductsTab';
 import StockTab      from './tabs/StockTab';
 import PricesTab     from './tabs/PricesTab';
 import CategoriesTab from './tabs/CategoriesTab';
+import OperationsTab from './tabs/OperationsTab';
 import ProductModal      from './modals/ProductModal';
 import CategoryModal     from './modals/CategoryModal';
 import StockAdjustModal  from './modals/StockAdjustModal';
+import OperationModal    from './modals/OperationModal';
+import SupplierModal     from './modals/SupplierModal';
+import WarehouseModal    from './modals/WarehouseModal';
 
 const TABS = [
-  { id: 'products',   label: 'Ficha de producto', icon: '📦' },
-  { id: 'stock',      label: 'Stock en tiempo real', icon: '📊' },
-  { id: 'prices',     label: 'Precios y costos',  icon: '🏷️' },
-  { id: 'categories', label: 'Categorías',        icon: '🗂️' },
+  { id: 'products',    label: 'Ficha de producto',   icon: '📦' },
+  { id: 'stock',       label: 'Stock en tiempo real', icon: '📊' },
+  { id: 'prices',      label: 'Precios y costos',     icon: '🏷️' },
+  { id: 'categories',  label: 'Categorías',           icon: '🗂️' },
+  { id: 'operations',  label: 'Operaciones',          icon: '🔄' },
 ];
 
 export default function InventoryModule() {
@@ -22,9 +28,11 @@ export default function InventoryModule() {
   const setTab    = (id) => setSearchParams({ tab: id }, { replace: true });
 
   const inv = useInventory();
+  const ops = useOperations();
 
   const lowStock = inv.products.filter((p) => p.stock_available > 0 && p.stock_available <= (p.stock_min ?? 0)).length;
   const outStock = inv.products.filter((p) => (p.stock_available ?? 0) <= 0).length;
+  const pendingOps = ops.ops.filter((o) => o.status === 'borrador').length;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -37,6 +45,7 @@ export default function InventoryModule() {
             {inv.products.length} producto{inv.products.length !== 1 ? 's' : ''}
             {outStock > 0 && <span className="text-red-500 font-semibold">· {outStock} sin stock</span>}
             {lowStock > 0 && <span className="text-yellow-600 font-semibold">· {lowStock} stock bajo</span>}
+            {pendingOps > 0 && <span className="text-yellow-600 font-semibold">· {pendingOps} op. pendiente{pendingOps !== 1 ? 's' : ''}</span>}
           </p>
         </div>
         <button
@@ -56,7 +65,7 @@ export default function InventoryModule() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all relative ${
               activeTab === t.id
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -64,6 +73,9 @@ export default function InventoryModule() {
           >
             <span>{t.icon}</span>
             <span className="hidden sm:inline">{t.label}</span>
+            {t.id === 'operations' && pendingOps > 0 && (
+              <span className="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{pendingOps}</span>
+            )}
           </button>
         ))}
       </div>
@@ -111,6 +123,26 @@ export default function InventoryModule() {
               onDelete={inv.handleDeleteCategory}
             />
           )}
+          {activeTab === 'operations' && (
+            <OperationsTab
+              ops={ops.ops}
+              suppliers={ops.suppliers}
+              warehouses={ops.warehouses}
+              saving={ops.saving}
+              openNewOp={ops.openNewOp}
+              openEditOp={ops.openEditOp}
+              handleConfirmOp={ops.handleConfirmOp}
+              handleCancelOp={ops.handleCancelOp}
+              handleDeleteOp={ops.handleDeleteOp}
+              handleReapplyStock={ops.handleReapplyStock}
+              openAddSupplier={ops.openAddSupplier}
+              openEditSupplier={ops.openEditSupplier}
+              handleDeleteSupplier={ops.handleDeleteSupplier}
+              openAddWarehouse={ops.openAddWarehouse}
+              openEditWarehouse={ops.openEditWarehouse}
+              handleDeleteWarehouse={ops.handleDeleteWarehouse}
+            />
+          )}
         </>
       )}
 
@@ -120,6 +152,8 @@ export default function InventoryModule() {
         form={inv.productForm}
         setF={inv.setPF}
         categories={inv.categories}
+        warehouses={ops.warehouses}
+        suppliers={ops.suppliers}
         onSave={inv.handleSaveProduct}
         onClose={inv.closeProductModal}
         saving={inv.saving}
@@ -143,6 +177,41 @@ export default function InventoryModule() {
         onClose={inv.closeStockModal}
         saving={inv.saving}
         error={inv.error}
+      />
+      <OperationModal
+        opModal={ops.opModal}
+        opForm={ops.opForm}
+        setOF={ops.setOF}
+        items={ops.items}
+        setItem={ops.setItem}
+        addItem={ops.addItem}
+        removeItem={ops.removeItem}
+        suppliers={ops.suppliers}
+        warehouses={ops.warehouses}
+        products={inv.products}
+        pendingDocs={ops.pendingDocs}
+        saving={ops.saving}
+        error={ops.error}
+        closeOpModal={ops.closeOpModal}
+        handleSaveOp={ops.handleSaveOp}
+        openAddSupplier={ops.openAddSupplier}
+        openAddWarehouse={ops.openAddWarehouse}
+      />
+      <SupplierModal
+        modal={ops.suppModal}
+        form={ops.suppForm}
+        setF={ops.setSF}
+        saving={ops.saving}
+        onSave={ops.handleSaveSupplier}
+        onClose={ops.closeSuppModal}
+      />
+      <WarehouseModal
+        modal={ops.whModal}
+        form={ops.whForm}
+        setF={ops.setWF}
+        saving={ops.saving}
+        onSave={ops.handleSaveWarehouse}
+        onClose={ops.closeWhModal}
       />
     </div>
   );

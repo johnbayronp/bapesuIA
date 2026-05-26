@@ -30,6 +30,19 @@ const TOOLS = [
       </svg>
     ),
   },
+  {
+    title: 'Inventario',
+    desc: 'Registra entradas, salidas y consulta el stock en tiempo real.',
+    href: '/dashboard/inventory',
+    gradient: 'from-violet-400 to-purple-500',
+    iconBg: 'bg-violet-100',
+    icon: (
+      <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+  },
 ];
 
 export default function DashHome() {

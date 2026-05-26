@@ -15,6 +15,7 @@ export const EMPTY_PRODUCT = {
   stock_in_transit: 0,
   stock_min:        0,
   stock_location:  '',
+  supplier_id:     '',
   purchase_price:  '',
   sale_price:      '',
   tax_rate:        19,
