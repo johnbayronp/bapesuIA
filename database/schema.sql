@@ -64,12 +64,16 @@ CREATE TABLE IF NOT EXISTS public.bapesu_companies (
     city         TEXT,
     logo_url     TEXT,
     payment_info TEXT,
+    brand_color  TEXT        DEFAULT '#0f172a',
     plan         TEXT        DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
     is_active    BOOLEAN     DEFAULT TRUE,
     created_by   UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at   TIMESTAMPTZ DEFAULT NOW(),
     updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migración: columna de color de marca (idempotente)
+ALTER TABLE public.bapesu_companies ADD COLUMN IF NOT EXISTS brand_color TEXT DEFAULT '#0f172a';
 
 CREATE INDEX IF NOT EXISTS idx_bapesu_companies_created_by ON public.bapesu_companies(created_by);
 
@@ -774,4 +778,161 @@ ALTER TABLE public.bapesu_products
 -- =====================================================================
 -- FIN — schema.sql
 -- Idempotente: puedes correrlo sobre una BD vacía o existente.
+-- =====================================================================
+-- =====================================================================
+-- BAPESU PLATFORM — Super-Admin, Planes y Suscripciones
+-- Idempotente: puede correrse varias veces sin errores
+-- =====================================================================
+
+-- ── 1. Ampliar CHECK de roles para incluir 'superadmin' ──────────────
+ALTER TABLE public.users
+  DROP CONSTRAINT IF EXISTS users_role_check;
+
+ALTER TABLE public.users
+  ADD CONSTRAINT users_role_check
+  CHECK (role IN ('superadmin', 'admin', 'user'));
+
+-- ── 2. Tabla de planes ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.bapesu_plans (
+  id            TEXT        PRIMARY KEY,
+  name          TEXT        NOT NULL,
+  description   TEXT,
+  price_cop     INTEGER     DEFAULT 0,
+  max_users     INTEGER     DEFAULT 1,
+  max_clients   INTEGER     DEFAULT 50,
+  max_products  INTEGER     DEFAULT 0,
+  modules       JSONB       DEFAULT '[]'::jsonb,
+  is_active     BOOLEAN     DEFAULT TRUE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Datos iniciales (upsert seguro)
+INSERT INTO public.bapesu_plans (id, name, description, price_cop, max_users, max_clients, max_products, modules) VALUES
+  ('free',
+   'Gratis',
+   'Para empezar sin costo. Módulos básicos.',
+   0, 1, 50, 0,
+   '["clientes","cobros","cotizaciones"]'::jsonb),
+
+  ('pro',
+   'Pro',
+   'Para negocios en crecimiento. Todos los módulos.',
+   79000, 5, 500, 200,
+   '["clientes","cobros","cotizaciones","servicios","inventario","reminders","analytics"]'::jsonb),
+
+  ('enterprise',
+   'Enterprise',
+   'Sin límites. Soporte prioritario.',
+   0, 999, 9999, 9999,
+   '["clientes","cobros","cotizaciones","servicios","inventario","reminders","analytics","facturacion"]'::jsonb)
+
+ON CONFLICT (id) DO UPDATE SET
+  name         = EXCLUDED.name,
+  description  = EXCLUDED.description,
+  price_cop    = EXCLUDED.price_cop,
+  max_users    = EXCLUDED.max_users,
+  max_clients  = EXCLUDED.max_clients,
+  max_products = EXCLUDED.max_products,
+  modules      = EXCLUDED.modules,
+  updated_at   = NOW();
+
+-- ── 3. Tabla de suscripciones ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.bapesu_subscriptions (
+  id           UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_id   UUID        NOT NULL REFERENCES public.bapesu_companies(id) ON DELETE CASCADE,
+  plan_id      TEXT        NOT NULL REFERENCES public.bapesu_plans(id),
+  status       TEXT        NOT NULL DEFAULT 'active'
+                           CHECK (status IN ('active','trial','suspended','cancelled')),
+  trial_ends   DATE,
+  renews_at    DATE,
+  notes        TEXT,
+  created_by   UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_company ON public.bapesu_subscriptions(company_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_plan    ON public.bapesu_subscriptions(plan_id);
+
+DROP TRIGGER IF EXISTS trg_subscriptions_updated_at ON public.bapesu_subscriptions;
+CREATE TRIGGER trg_subscriptions_updated_at
+  BEFORE UPDATE ON public.bapesu_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+-- ── 4. RLS: solo superadmin puede leer/escribir planes ───────────────
+ALTER TABLE public.bapesu_plans         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bapesu_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Planes: lectura pública (para mostrar precios), escritura solo superadmin
+DROP POLICY IF EXISTS "plans_select" ON public.bapesu_plans;
+CREATE POLICY "plans_select" ON public.bapesu_plans
+  FOR SELECT TO authenticated USING (TRUE);
+
+DROP POLICY IF EXISTS "plans_superadmin_write" ON public.bapesu_plans;
+CREATE POLICY "plans_superadmin_write" ON public.bapesu_plans
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'superadmin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'superadmin'));
+
+-- Suscripciones: solo superadmin
+DROP POLICY IF EXISTS "subs_superadmin" ON public.bapesu_subscriptions;
+CREATE POLICY "subs_superadmin" ON public.bapesu_subscriptions
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'superadmin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'superadmin'));
+
+-- ── 5. Función helper: ¿es superadmin el usuario actual? ─────────────
+CREATE OR REPLACE FUNCTION public.is_superadmin()
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'superadmin')
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_superadmin() TO authenticated;
+
+-- ── 6. Superadmin puede leer TODAS las empresas ──────────────────────
+DROP POLICY IF EXISTS "companies_superadmin_all" ON public.bapesu_companies;
+CREATE POLICY "companies_superadmin_all" ON public.bapesu_companies
+  FOR ALL TO authenticated
+  USING (public.is_superadmin())
+  WITH CHECK (public.is_superadmin());
+
+-- ── 7. Superadmin puede leer TODOS los usuarios ──────────────────────
+DROP POLICY IF EXISTS "users_superadmin_all" ON public.users;
+CREATE POLICY "users_superadmin_all" ON public.users
+  FOR ALL TO authenticated
+  USING (public.is_superadmin())
+  WITH CHECK (public.is_superadmin());
+
+-- ── 8. Función superadmin: crear/asignar usuario a cualquier empresa ──
+-- A diferencia de admin_assign_user_to_company, esta no valida
+-- que el caller sea de la misma empresa — solo verifica que sea superadmin.
+CREATE OR REPLACE FUNCTION public.superadmin_assign_user_to_company(
+    p_user_id    UUID,
+    p_company_id UUID,
+    p_role       TEXT DEFAULT 'admin'
+)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    caller_role TEXT;
+BEGIN
+    SELECT role INTO caller_role FROM public.users WHERE id = auth.uid() LIMIT 1;
+    IF caller_role <> 'superadmin' THEN
+        RAISE EXCEPTION 'Solo el superadmin puede usar esta función';
+    END IF;
+
+    INSERT INTO public.users (id, email, role, company_id, is_active, updated_at)
+    SELECT p_user_id, au.email, p_role, p_company_id, TRUE, NOW()
+    FROM auth.users au
+    WHERE au.id = p_user_id
+    ON CONFLICT (id) DO UPDATE SET
+        role       = EXCLUDED.role,
+        company_id = EXCLUDED.company_id,
+        is_active  = TRUE,
+        updated_at = NOW();
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.superadmin_assign_user_to_company(UUID, UUID, TEXT) TO authenticated;
+
 -- =====================================================================

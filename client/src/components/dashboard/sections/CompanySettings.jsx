@@ -11,7 +11,28 @@ const EMPTY = {
   phone: '', email: '', instagram: '', website: '',
   address: '', city: '',
   logo_url: '', payment_info: '',
+  brand_color: '#0f172a',
 };
+
+const BRAND_PRESETS = [
+  { hex: '#0f172a', label: 'Slate' },
+  { hex: '#1e3a5f', label: 'Navy' },
+  { hex: '#064e3b', label: 'Esmeralda' },
+  { hex: '#3b0764', label: 'Violeta' },
+  { hex: '#4c0519', label: 'Carmesí' },
+  { hex: '#1c1917', label: 'Espresso' },
+  { hex: '#0c1445', label: 'Índigo' },
+  { hex: '#7c2d12', label: 'Terracota' },
+];
+
+function lightenHex(hex, amount) {
+  const h = (hex || '#0f172a').replace('#', '');
+  if (h.length < 6) return hex;
+  const r = Math.min(255, parseInt(h.slice(0, 2), 16) + amount);
+  const g = Math.min(255, parseInt(h.slice(2, 4), 16) + amount);
+  const b = Math.min(255, parseInt(h.slice(4, 6), 16) + amount);
+  return `rgb(${r},${g},${b})`;
+}
 
 export default function CompanySettings() {
   const { company, profile, refresh } = useCompany();
@@ -70,6 +91,7 @@ export default function CompanySettings() {
           city:         form.city?.trim() || null,
           logo_url:     form.logo_url?.trim() || null,
           payment_info: form.payment_info?.trim() || null,
+          brand_color:  form.brand_color || '#0f172a',
         })
         .eq('id', company.id);
 
@@ -92,7 +114,7 @@ export default function CompanySettings() {
     );
   }
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -296,6 +318,112 @@ export default function CompanySettings() {
           disabled={!isAdmin}
           placeholder="Bancolombia • Ahorros • 123-456-789-00"
         />
+      </div>
+
+      {/* Card: apariencia */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-5 shadow-sm">
+        <h2 className="text-base font-semibold text-gray-900 mb-0.5">Apariencia de documentos</h2>
+        <p className="text-xs text-gray-500 mb-5">Color principal que se aplica en cotizaciones, cuentas de cobro y facturas.</p>
+
+        {/* Paleta de presets */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {BRAND_PRESETS.map(({ hex, label }) => (
+            <button
+              key={hex}
+              type="button"
+              disabled={!isAdmin}
+              onClick={() => setF('brand_color', hex)}
+              title={label}
+              className={`w-9 h-9 rounded-xl border-2 transition shadow-sm hover:scale-105 ${
+                form.brand_color === hex ? 'border-yellow-400 scale-110 shadow-md' : 'border-transparent hover:border-gray-300'
+              }`}
+              style={{ background: hex }}
+            />
+          ))}
+
+          {/* Picker personalizado */}
+          <label
+            title="Color personalizado"
+            className={`relative w-9 h-9 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center hover:border-yellow-400 transition cursor-pointer overflow-hidden ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <span className="text-gray-400 text-xs font-bold select-none z-10">+</span>
+            <input
+              type="color"
+              disabled={!isAdmin}
+              value={form.brand_color || '#0f172a'}
+              onChange={(e) => setF('brand_color', e.target.value)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </label>
+        </div>
+
+        {/* Mini preview del documento */}
+        <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+          {/* Header del doc */}
+          <div
+            style={{ background: form.brand_color || '#0f172a', color: '#fff' }}
+            className="px-4 py-3 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2.5">
+              {form.logo_url ? (
+                <div className="bg-white rounded-lg p-0.5">
+                  <img src={form.logo_url} alt="" className="h-7 w-7 object-contain rounded" />
+                </div>
+              ) : (
+                <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center font-extrabold text-sm">
+                  {(form.name?.[0] ?? 'E').toUpperCase()}
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-extrabold leading-tight">{form.name || 'Tu empresa'}</p>
+                <p className="text-[9px] opacity-70">{form.tagline || 'Slogan'}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] opacity-60 uppercase tracking-widest">Cotización</p>
+              <p className="text-base font-extrabold">N° 001</p>
+            </div>
+          </div>
+          {/* Tabla header */}
+          <div
+            style={{ background: lightenHex(form.brand_color || '#0f172a', 35), color: '#fff' }}
+            className="px-4 py-1.5 grid grid-cols-4 gap-2 text-[9px] uppercase tracking-widest font-semibold opacity-90"
+          >
+            <span className="col-span-2">Descripción</span>
+            <span className="text-right">Precio</span>
+            <span className="text-right">Total</span>
+          </div>
+          {/* Body simulado */}
+          <div className="px-4 py-2 flex justify-between text-[10px] text-gray-500 border-b border-gray-100">
+            <span className="col-span-2">Diseño de branding</span>
+            <span>$200.000</span>
+            <span className="font-semibold text-gray-800">$200.000</span>
+          </div>
+          {/* Footer */}
+          <div
+            style={{ background: form.brand_color || '#0f172a', color: '#fff' }}
+            className="px-4 py-1.5 text-[9px] flex justify-between opacity-90"
+          >
+            <span>{form.phone || '300 000 0000'}</span>
+            <span>{form.email || 'hola@tuempresa.com'}</span>
+            <span>{form.instagram ? `@${form.instagram.replace('@','')}` : '@tuempresa'}</span>
+          </div>
+        </div>
+
+        {/* Hex manual */}
+        <div className="mt-3 flex items-center gap-2">
+          <div className="w-5 h-5 rounded flex-shrink-0 border border-gray-200" style={{ background: form.brand_color || '#0f172a' }} />
+          <input
+            type="text"
+            value={form.brand_color || '#0f172a'}
+            onChange={(e) => { if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) setF('brand_color', e.target.value); }}
+            disabled={!isAdmin}
+            maxLength={7}
+            placeholder="#0f172a"
+            className="w-28 px-2 py-1 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+          />
+          <span className="text-xs text-gray-400">Código hex del color</span>
+        </div>
       </div>
 
       {/* Plan */}

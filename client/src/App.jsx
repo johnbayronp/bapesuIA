@@ -38,15 +38,17 @@ import YoutubeDescription from './components/studio/YoutubeDescription';
 import ColaboraPage from './components/ColaboraPage';
 import SponsorsBar from './components/common/SponsorsBar';
 import BusinessDashboard from './components/dashboard/BusinessDashboard';
+import SuperAdminDashboard from './components/superadmin/SuperAdminDashboard';
 import { CompanyProvider } from './context/CompanyContext';
 
 // Layout que oculta Header/Footer/etc. cuando estamos en /dashboard
 function AppLayout() {
   useAuthRefresh();
   const location = useLocation();
-  const isDashboard = location.pathname.startsWith('/dashboard');
+  const isDashboard  = location.pathname.startsWith('/dashboard');
+  const isSuperAdmin = location.pathname.startsWith('/superadmin');
 
-  if (isDashboard) {
+  if (isDashboard || isSuperAdmin) {
     return (
       <CompanyProvider>
         <Routes>
@@ -55,6 +57,14 @@ function AppLayout() {
             element={
               <ProtectedRoute>
                 <BusinessDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/*"
+            element={
+              <ProtectedRoute>
+                <SuperAdminDashboard />
               </ProtectedRoute>
             }
           />

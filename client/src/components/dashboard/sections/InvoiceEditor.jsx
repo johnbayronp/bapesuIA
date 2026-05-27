@@ -15,6 +15,15 @@ const numberToWords = (n) => {
 const INPUT = 'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 focus:border-yellow-400 transition';
 const LABEL = 'block text-xs font-medium text-gray-600 mb-1';
 
+function lightenHex(hex, amount) {
+  const h = (hex || '#064e3b').replace('#', '');
+  if (h.length < 6) return hex;
+  const r = Math.min(255, parseInt(h.slice(0, 2), 16) + amount);
+  const g = Math.min(255, parseInt(h.slice(2, 4), 16) + amount);
+  const b = Math.min(255, parseInt(h.slice(4, 6), 16) + amount);
+  return `rgb(${r},${g},${b})`;
+}
+
 const DEFAULT_INV = {
   number: '',
   issue_date: new Date().toISOString().slice(0, 10),
@@ -33,6 +42,8 @@ const newItem = () => ({ service_id: null, description: '', quantity: 1, price: 
 
 export default function InvoiceEditor() {
   const { user, company } = useCompany();
+  const brandColor  = company?.brand_color || '#064e3b';
+  const accentColor = lightenHex(brandColor, 35);
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -366,7 +377,7 @@ export default function InvoiceEditor() {
         <div id="invoice-preview-col">
           <div id="invoice-print" className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden text-gray-900">
             {/* Header */}
-            <div style={{ background: '#064e3b', color: '#fff' }} className="px-7 py-5 flex items-center justify-between gap-4">
+            <div style={{ background: brandColor, color: '#fff' }} className="px-7 py-5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
                 {company?.logo_url && (
                   <div className="flex-shrink-0 bg-white rounded-xl p-1.5 shadow-md">
@@ -413,7 +424,7 @@ export default function InvoiceEditor() {
 
             {/* Items */}
             <table className="w-full text-xs">
-              <thead style={{ background: '#047857', color: '#fff' }}>
+              <thead style={{ background: accentColor, color: '#fff' }}>
                 <tr>
                   <th className="px-7 py-2 text-left font-semibold uppercase tracking-wider text-[10px]">Descripción</th>
                   <th className="px-3 py-2 text-center font-semibold uppercase tracking-wider text-[10px] w-12">Cant.</th>
@@ -441,7 +452,7 @@ export default function InvoiceEditor() {
                 {inv.include_retefuente && <div className="flex justify-between text-red-600"><span>Retefuente (-{inv.retefuente_rate}%)</span><span className="font-semibold">-{formatCOP(retAmt)}</span></div>}
                 <div className="flex justify-between pt-2 border-t border-gray-200 text-base">
                   <span className="font-bold text-gray-900">TOTAL</span>
-                  <span className="font-extrabold" style={{ color: '#047857' }}>{formatCOP(total)}</span>
+                  <span className="font-extrabold" style={{ color: brandColor }}>{formatCOP(total)}</span>
                 </div>
                 <p className="text-[10px] text-gray-400 italic mt-1 text-right capitalize">{numberToWords(total)}</p>
               </div>
@@ -461,7 +472,7 @@ export default function InvoiceEditor() {
             )}
 
             {/* Footer */}
-            <div style={{ background: '#064e3b', color: '#fff' }} className="px-7 py-3 text-[10px] flex items-center justify-between flex-wrap gap-2">
+            <div style={{ background: brandColor, color: '#fff' }} className="px-7 py-3 text-[10px] flex items-center justify-between flex-wrap gap-2">
               <span>{company?.phone}</span>
               <span>{company?.email}</span>
               <span>{company?.address}{company?.city ? `, ${company.city}` : ''}</span>
