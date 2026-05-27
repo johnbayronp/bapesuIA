@@ -1,11 +1,26 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
+// ── Módulos por plan ──────────────────────────────────────────────────
+export const PLAN_MODULES = {
+  free:       ['clientes', 'cobros', 'cotizaciones'],
+  pro:        ['clientes', 'cobros', 'cotizaciones', 'servicios', 'inventario', 'reminders', 'analytics'],
+  enterprise: ['clientes', 'cobros', 'cotizaciones', 'servicios', 'inventario', 'reminders', 'analytics', 'facturacion'],
+};
+
+export const PLAN_LABELS = {
+  free:       { label: 'Gratis',     color: 'bg-gray-100 text-gray-600' },
+  pro:        { label: 'Pro',        color: 'bg-yellow-100 text-yellow-700' },
+  enterprise: { label: 'Enterprise', color: 'bg-violet-100 text-violet-700' },
+};
+
 const CompanyContext = createContext({
   user: null,
   profile: null,
   company: null,
   loading: true,
+  isSuperAdmin: false,
+  canAccess: () => true,
   refresh: async () => {},
   setCompanyId: async () => {},
 });
@@ -73,9 +88,19 @@ export function CompanyProvider({ children }) {
     await loadAll();
   };
 
+  const isSuperAdmin = profile?.role === 'superadmin';
+
+  // Devuelve true si el plan de la empresa incluye el módulo (o si es superadmin)
+  const canAccess = (moduleId) => {
+    if (isSuperAdmin) return true;
+    const plan = company?.plan ?? 'free';
+    const allowed = PLAN_MODULES[plan] ?? PLAN_MODULES.free;
+    return allowed.includes(moduleId);
+  };
+
   return (
     <CompanyContext.Provider
-      value={{ user, profile, company, loading, refresh: loadAll, setCompanyId }}
+      value={{ user, profile, company, loading, isSuperAdmin, canAccess, refresh: loadAll, setCompanyId }}
     >
       {children}
     </CompanyContext.Provider>

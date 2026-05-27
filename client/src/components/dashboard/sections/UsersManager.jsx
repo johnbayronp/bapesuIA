@@ -8,8 +8,9 @@ const INPUT = 'w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-w
 const LABEL = 'block text-xs font-medium text-gray-600 mb-1';
 
 const ROLE_LABELS = {
-  admin:  { label: 'Administrador', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  user:   { label: 'Usuario',       color: 'text-indigo-700', bg: 'bg-indigo-100' },
+  superadmin: { label: 'Super Admin',   color: 'text-violet-700', bg: 'bg-violet-100' },
+  admin:      { label: 'Administrador', color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  user:       { label: 'Usuario',       color: 'text-indigo-700', bg: 'bg-indigo-100' },
 };
 
 const generatePassword = () => {
@@ -29,7 +30,7 @@ export default function UsersManager() {
   const [showPwd, setShowPwd] = useState(false);
   const [createdInfo, setCreatedInfo] = useState(null); // muestra credenciales tras crear
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
   const load = useCallback(async () => {
     if (!company?.id) return;
