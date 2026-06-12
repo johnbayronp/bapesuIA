@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { db } from '../api/db';
 
 // ── Módulos por plan ──────────────────────────────────────────────────
 export const PLAN_MODULES = {
@@ -44,7 +45,7 @@ export function CompanyProvider({ children }) {
       }
 
       // Cargar perfil del usuario (con company_id)
-      const { data: p } = await supabase
+      const { data: p } = await db
         .from('users')
         .select('id, email, role, company_id, first_name, last_name, is_active')
         .eq('id', u.id)
@@ -54,7 +55,7 @@ export function CompanyProvider({ children }) {
 
       // Cargar la empresa del usuario
       if (p?.company_id) {
-        const { data: c } = await supabase
+        const { data: c } = await db
           .from('bapesu_companies')
           .select('*')
           .eq('id', p.company_id)
@@ -81,7 +82,7 @@ export function CompanyProvider({ children }) {
   // Asigna el company_id al perfil del usuario y recarga
   const setCompanyId = async (companyId) => {
     if (!user) return;
-    await supabase
+    await db
       .from('users')
       .update({ company_id: companyId, updated_at: new Date().toISOString() })
       .eq('id', user.id);

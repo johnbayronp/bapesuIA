@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { facturasApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
+import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/queryUtils';
 
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
@@ -15,35 +18,43 @@ const STATUS = {
 
 export default function FacturacionList() {
   const { company } = useCompany();
-  const navigate    = useNavigate();
-  const [facturas, setFacturas] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch]     = useState('');
   const [statusFilter, setStatus] = useState('all');
 
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('bapesu_facturas')
-      .select('id, prefix, number, issue_date, due_date, client_name, client_nit, total, status')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false });
-    setFacturas(data ?? []);
-    setLoading(false);
-  }, [company]);
+  const facturasQuery = useQuery({
+    queryKey: queryKeys.company.facturas(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => facturasApi.list(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const facturas = facturasQuery.data ?? EMPTY_ARRAY;
+  const loading = facturasQuery.isLoading;
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await facturasApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      const response = await facturasApi.update(id, { status, updated_at: new Date().toISOString() });
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
 
   const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar esta factura?')) return;
-    await supabase.from('bapesu_facturas').delete().eq('id', id);
-    await load();
+    await deleteMutation.mutateAsync(id);
   };
 
   const handleStatus = async (id, status) => {
-    await supabase.from('bapesu_facturas').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
-    await load();
+    await statusMutation.mutateAsync({ id, status });
   };
 
   // KPIs
@@ -52,7 +63,7 @@ export default function FacturacionList() {
   const totalRev = paid.reduce((a, f) => a + Number(f.total), 0);
   const totalPend = pending.reduce((a, f) => a + Number(f.total), 0);
 
-  const filtered = facturas.filter((f) => {
+  const filtered = useMemo(() => facturas.filter((f) => {
     if (statusFilter !== 'all' && f.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -63,7 +74,7 @@ export default function FacturacionList() {
       );
     }
     return true;
-  });
+  }), [facturas, search, statusFilter]);
 
   return (
     <div className="max-w-5xl mx-auto">

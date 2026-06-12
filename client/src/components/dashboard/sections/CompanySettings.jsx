@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { companiesApi } from '../../../api';
 import { uploadToS3 } from '../../../lib/s3Upload';
 import { useCompany } from '../../../context/CompanyContext';
+import { invalidateCompanyData } from '../../../lib/queryUtils';
 
 const INPUT = 'w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 focus:border-yellow-400 transition';
 const LABEL = 'block text-xs font-medium text-gray-600 mb-1.5';
@@ -36,6 +38,7 @@ function lightenHex(hex, amount) {
 
 export default function CompanySettings() {
   const { company, profile, refresh } = useCompany();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving]       = useState(false);
   const [savedAt, setSavedAt]     = useState(null);
@@ -44,6 +47,14 @@ export default function CompanySettings() {
   const [uploadErr, setUploadErr] = useState('');
   const [dragOver, setDragOver]   = useState(false);
   const fileInputRef              = useRef(null);
+
+  const updateCompanyMutation = useMutation({
+    mutationFn: async (payload) => {
+      const response = await companiesApi.update(company.id, payload);
+      if (response.error) throw response.error;
+    },
+    onSuccess: () => invalidateCompanyData(queryClient, company?.id),
+  });
 
   useEffect(() => {
     if (company) {
@@ -77,9 +88,7 @@ export default function CompanySettings() {
     setSaving(true); setError('');
 
     try {
-      const { error: e } = await supabase
-        .from('bapesu_companies')
-        .update({
+      await updateCompanyMutation.mutateAsync({
           name:         form.name?.trim() || company.name,
           nit:          form.nit?.trim() || null,
           tagline:      form.tagline?.trim() || null,
@@ -92,10 +101,7 @@ export default function CompanySettings() {
           logo_url:     form.logo_url?.trim() || null,
           payment_info: form.payment_info?.trim() || null,
           brand_color:  form.brand_color || '#0f172a',
-        })
-        .eq('id', company.id);
-
-      if (e) throw e;
+        });
 
       setSavedAt(new Date());
       await refresh();

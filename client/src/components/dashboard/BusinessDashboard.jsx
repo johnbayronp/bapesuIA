@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { superadminApi } from '../../api';
 import { useCompany, PLAN_LABELS } from '../../context/CompanyContext';
 import CompanyOnboarding from './CompanyOnboarding';
 import DashHome from './sections/DashHome';
@@ -39,26 +41,26 @@ const formatCOP = (n) =>
 // Pantalla mostrada cuando el módulo no está en el plan
 function LockedModule({ moduleName, plan }) {
   const [showModal, setShowModal] = useState(false);
-  const [plans,     setPlans]     = useState([]);
-  const [loadingP,  setLoadingP]  = useState(false);
   const navigate  = useNavigate();
   const planInfo  = PLAN_LABELS[plan] ?? PLAN_LABELS.free;
   const currentIdx = PLAN_ORDER.indexOf(plan ?? 'free');
 
+  const plansQuery = useQuery({
+    queryKey: ['plans', 'upgrade', plan],
+    enabled: showModal,
+    queryFn: async () => {
+      const response = await superadminApi.listPlans();
+      if (response.error) throw response.error;
+      return (response.data ?? [])
+        .filter((p) => p.is_active && PLAN_ORDER.indexOf(p.id) > currentIdx)
+        .sort((a, b) => PLAN_ORDER.indexOf(a.id) - PLAN_ORDER.indexOf(b.id));
+    },
+  });
+  const plans = plansQuery.data ?? [];
+  const loadingP = plansQuery.isLoading;
+
   const openModal = async () => {
     setShowModal(true);
-    if (plans.length) return;
-    setLoadingP(true);
-    const { data } = await supabase
-      .from('bapesu_plans')
-      .select('id, name, description, price_cop, modules')
-      .eq('is_active', true);
-    // Solo mostrar planes superiores al actual, ordenados por jerarquía
-    const higher = (data ?? [])
-      .filter((p) => PLAN_ORDER.indexOf(p.id) > currentIdx)
-      .sort((a, b) => PLAN_ORDER.indexOf(a.id) - PLAN_ORDER.indexOf(b.id));
-    setPlans(higher);
-    setLoadingP(false);
   };
 
   return (

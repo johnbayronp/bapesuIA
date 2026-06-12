@@ -4,9 +4,16 @@ export const operationsApi = {
   // ── Operaciones ──────────────────────────────────────────────────
   list: (companyId) =>
     db.from('bapesu_inventory_ops')
-      .select('*, bapesu_suppliers(name), bapesu_warehouses!warehouse_to(name), bapesu_warehouses!warehouse_from(name)')
+      .select('*, bapesu_suppliers(name), wh_from:bapesu_warehouses!bapesu_inventory_ops_warehouse_from_fkey(name), wh_to:bapesu_warehouses!bapesu_inventory_ops_warehouse_to_fkey(name)')
       .eq('company_id', companyId)
-      .order('created_at', { ascending: false }),
+      .order('op_date', { ascending: false })
+      .limit(200),
+
+  countByType: (companyId, type) =>
+    db.from('bapesu_inventory_ops')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('type', type),
 
   getWithItems: (id) =>
     db.from('bapesu_inventory_ops')
@@ -20,6 +27,9 @@ export const operationsApi = {
   update: (id, payload) =>
     db.from('bapesu_inventory_ops').update(payload).eq('id', id),
 
+  remove: (id) =>
+    db.from('bapesu_inventory_ops').delete().eq('id', id),
+
   // Items
   addItems: (items) =>
     db.from('bapesu_inventory_op_items').insert(items),
@@ -28,6 +38,15 @@ export const operationsApi = {
     db.from('bapesu_inventory_op_items')
       .select('*, bapesu_products(id,name,unit,stock_available,purchase_price,sale_price)')
       .eq('op_id', opId),
+
+  listRawItems: (opId) =>
+    db.from('bapesu_inventory_op_items').select('*').eq('op_id', opId),
+
+  listRawItemsOrdered: (opId) =>
+    db.from('bapesu_inventory_op_items').select('*').eq('op_id', opId).order('position'),
+
+  removeItems: (opId) =>
+    db.from('bapesu_inventory_op_items').delete().eq('op_id', opId),
 
   // ── Proveedores ──────────────────────────────────────────────────
   listSuppliers: (companyId) =>

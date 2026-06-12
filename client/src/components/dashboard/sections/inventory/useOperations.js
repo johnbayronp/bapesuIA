@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { operationsApi, inventoryApi } from '../../../../api';
-import { db } from '../../../../api/db';
 import { useCompany } from '../../../../context/CompanyContext';
+import { queryKeys } from '../../../../lib/queryKeys';
+import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseCount, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
 
 // Alias para queries puntuales que no justifican un método en la capa api aún
-const supabase = db;
-
 const PREFIX = { entrada: 'ENT', salida: 'SAL', traslado: 'TRF', conteo: 'CNT' };
 
 const EMPTY_OP = {
@@ -31,13 +31,8 @@ export const OP_TYPES = {
 export function useOperations() {
   const { user, company } = useCompany();
 
-  const [ops,        setOps]        = useState([]);
-  const [suppliers,  setSuppliers]  = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
-  const [pendingDocs, setPendingDocs] = useState([]); // cuentas de cobro + facturas para Salida
-  const [loading,    setLoading]    = useState(true);
-  const [saving,     setSaving]     = useState(false);
   const [error,      setError]      = useState('');
+  const queryClient = useQueryClient();
 
   const [opModal, setOpModal]     = useState(null);
   const [opForm,  setOpForm]      = useState(EMPTY_OP);
@@ -49,34 +44,44 @@ export function useOperations() {
   const [whModal,   setWhModal]   = useState(null);
   const [whForm,    setWhForm]    = useState({ name:'', address:'', description:'' });
 
-  // ── Carga ────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const [opsRes, suppRes, whRes, invRes, facRes] = await Promise.all([
-      supabase
-        .from('bapesu_inventory_ops')
-        .select(`*, bapesu_suppliers(name), wh_from:bapesu_warehouses!bapesu_inventory_ops_warehouse_from_fkey(name), wh_to:bapesu_warehouses!bapesu_inventory_ops_warehouse_to_fkey(name)`)
-        .eq('company_id', company.id)
-        .order('op_date', { ascending: false })
-        .limit(200),
-      operationsApi.listSuppliers(company.id),
-      operationsApi.listWarehouses(company.id),
-      operationsApi.listPendingInvoices(company.id),
-      operationsApi.listPendingFacturas(company.id),
-    ]);
-    setOps(opsRes.data  ?? []);
-    setSuppliers(suppRes.data ?? []);
-    setWarehouses(whRes.data  ?? []);
-    // Combinar documentos pendientes para autocomplete en Salida
-    const invoices = (invRes.data ?? []).map((d) => ({ id: d.id, label: `CC #${d.number} — ${d.client_name}`, amount: d.total, type: 'cuenta' }));
-    const facturas = (facRes.data ?? []).map((d) => ({ id: d.id, label: `FAC ${d.prefix ?? ''}${d.number} — ${d.client_name}`, amount: d.total, type: 'factura' }));
-    setPendingDocs([...invoices, ...facturas]);
-    setLoading(false);
-  }, [company]);
+  const operationsQuery = useQuery({
+    queryKey: queryKeys.company.inventory.operations(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: async () => {
+      const [opsRes, suppRes, whRes, invRes, facRes] = await Promise.all([
+        operationsApi.list(company.id),
+        operationsApi.listSuppliers(company.id),
+        operationsApi.listWarehouses(company.id),
+        operationsApi.listPendingInvoices(company.id),
+        operationsApi.listPendingFacturas(company.id),
+      ]);
+      const invoices = unwrapSupabaseResponse(invRes).map((d) => ({ id: d.id, label: `CC #${d.number} ? ${d.client_name}`, amount: d.total, type: 'cuenta' }));
+      const facturas = unwrapSupabaseResponse(facRes).map((d) => ({ id: d.id, label: `FAC ${d.prefix ?? ''}${d.number} ? ${d.client_name}`, amount: d.total, type: 'factura' }));
+      return {
+        ops: unwrapSupabaseResponse(opsRes),
+        suppliers: unwrapSupabaseResponse(suppRes),
+        warehouses: unwrapSupabaseResponse(whRes),
+        pendingDocs: [...invoices, ...facturas],
+      };
+    },
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const ops = operationsQuery.data?.ops ?? EMPTY_ARRAY;
+  const suppliers = operationsQuery.data?.suppliers ?? EMPTY_ARRAY;
+  const warehouses = operationsQuery.data?.warehouses ?? EMPTY_ARRAY;
+  const pendingDocs = operationsQuery.data?.pendingDocs ?? EMPTY_ARRAY;
+  const load = () => operationsQuery.refetch();
 
+  const actionMutation = useMutation({
+    mutationFn: (fn) => fn(),
+    onSuccess: async () => {
+      await invalidateCompanyData(queryClient, company?.id);
+      await operationsQuery.refetch();
+    },
+  });
+
+  const saving = actionMutation.isPending;
+  const loading = operationsQuery.isLoading;
   // ── Helpers form ─────────────────────────────────────────
   const setOF = (k, v) => setOpForm((p) => ({ ...p, [k]: v }));
 
@@ -88,11 +93,10 @@ export function useOperations() {
   const openNewOp = async (type = 'entrada') => {
     // Auto-generar referencia: ENT-2026-003
     const year = new Date().getFullYear();
-    const { count } = await supabase
-      .from('bapesu_inventory_ops')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', company.id)
-      .eq('type', type);
+    const count = await queryClient.fetchQuery({
+      queryKey: [...queryKeys.company.inventory.operations(company?.id), 'count', type],
+      queryFn: () => operationsApi.countByType(company.id, type).then(unwrapSupabaseCount),
+    });
     const seq = String((count ?? 0) + 1).padStart(3, '0');
     const autoRef = `${PREFIX[type]}-${year}-${seq}`;
 
@@ -113,7 +117,10 @@ export function useOperations() {
       client_ref:    op.client_ref ?? '',
       notes:         op.notes ?? '',
     });
-    const { data: its } = await supabase.from('bapesu_inventory_op_items').select('*').eq('op_id', op.id).order('position');
+    const its = await queryClient.fetchQuery({
+      queryKey: queryKeys.company.inventory.opItems(op.id),
+      queryFn: () => operationsApi.listRawItemsOrdered(op.id).then(unwrapSupabaseResponse),
+    });
     setItems(its?.length ? its.map((it) => ({
       product_id:  it.product_id,
       quantity:    String(it.quantity),
@@ -131,8 +138,7 @@ export function useOperations() {
 
   // ── Guardar operación (sin confirmar aún) ────────────────
   const handleSaveOp = async (confirm = false) => {
-    if (items.every((it) => !it.product_id)) { setError('Agrega al menos un producto'); return; }
-    setSaving(true); setError('');
+    if (items.every((it) => !it.product_id)) { setError('Agrega al menos un producto'); return; } setError('');
     try {
       const payload = {
         type:          opForm.type,
@@ -150,22 +156,20 @@ export function useOperations() {
       let opId = opModal.id;
 
       if (opModal.mode === 'add') {
-        const { data: newOp, error: e } = await supabase
-          .from('bapesu_inventory_ops')
-          .insert({ ...payload, company_id: company.id, created_by: user?.id ?? null })
-          .select('id').single();
+        const { data: newOp, error: e } = await operationsApi.create({ ...payload, company_id: company.id, created_by: user?.id ?? null });
         if (e) throw e;
         opId = newOp.id;
       } else {
-        const { error: e } = await supabase.from('bapesu_inventory_ops').update(payload).eq('id', opId);
+        const { error: e } = await operationsApi.update(opId, payload);
         if (e) throw e;
-        await supabase.from('bapesu_inventory_op_items').delete().eq('op_id', opId);
+        const removeRes = await operationsApi.removeItems(opId);
+        if (removeRes.error) throw removeRes.error;
       }
 
       // Insertar items
       const validItems = items.filter((it) => it.product_id);
       if (validItems.length) {
-        const { error: ei } = await supabase.from('bapesu_inventory_op_items').insert(
+        const { error: ei } = await operationsApi.addItems(
           validItems.map((it, idx) => ({
             op_id:       opId,
             product_id:  it.product_id,
@@ -187,7 +191,6 @@ export function useOperations() {
       await load();
       closeOpModal();
     } catch (e) { setError(e.message ?? 'Error al guardar'); }
-    setSaving(false);
   };
 
   // ── Aplicar efectos de stock al confirmar ────────────────
@@ -202,8 +205,7 @@ export function useOperations() {
       const relevant  = type === 'conteo' ? counted : qty;
       if (!relevant && type !== 'conteo') continue;
 
-      const { data: prod, error: pe } = await supabase
-        .from('bapesu_products').select('stock_available,name').eq('id', it.product_id).single();
+      const { data: prod, error: pe } = await inventoryApi.getProductStock(it.product_id);
       if (pe || !prod) throw new Error(`No se encontró el producto (${it.product_id.slice(0, 8)})`);
 
       const cur = Number(prod.stock_available) || 0;
@@ -240,14 +242,11 @@ export function useOperations() {
         }
       }
 
-      const { error: ue } = await supabase
-        .from('bapesu_products')
-        .update({ stock_available: newStock, updated_at: new Date().toISOString() })
-        .eq('id', it.product_id);
+      const { error: ue } = await inventoryApi.updateProduct(it.product_id, { stock_available: newStock, updated_at: new Date().toISOString() });
       if (ue) throw new Error(`Error actualizando stock de "${prod.name}": ${ue.message}`);
 
       if (mvQty !== 0 || type === 'conteo') {
-        const { error: me } = await supabase.from('bapesu_stock_movements').insert({
+        const { error: me } = await inventoryApi.addMovement({
           company_id: company.id,
           product_id: it.product_id,
           type:       mvType,
@@ -260,10 +259,7 @@ export function useOperations() {
     }
 
     if (!revert) {
-      const { error: ce } = await supabase
-        .from('bapesu_inventory_ops')
-        .update({ status: 'confirmado', confirmed_at: new Date().toISOString(), confirmed_by: user?.id ?? null })
-        .eq('id', opId);
+      const { error: ce } = await operationsApi.update(opId, { status: 'confirmado', confirmed_at: new Date().toISOString(), confirmed_by: user?.id ?? null });
       if (ce) throw new Error(`Error confirmando operación: ${ce.message}`);
     }
   };
@@ -271,27 +267,29 @@ export function useOperations() {
   // ── Re-aplicar stock a una operación ya confirmada ──────
   const handleReapplyStock = async (op) => {
     if (!window.confirm(`¿Re-aplicar stock para "${OP_TYPES[op.type]?.label} ${op.reference}"?\n\nEsto volverá a aplicar el efecto sobre el stock. Úsalo sólo si el stock no se actualizó al confirmar.`)) return;
-    setSaving(true);
     try {
-      const { data: its } = await supabase.from('bapesu_inventory_op_items').select('*').eq('op_id', op.id);
-      if (!its?.length) { alert('Esta operación no tiene productos registrados.'); setSaving(false); return; }
+      const its = await queryClient.fetchQuery({
+        queryKey: queryKeys.company.inventory.opItems(op.id),
+        queryFn: () => operationsApi.listRawItems(op.id).then(unwrapSupabaseResponse),
+      });
+      if (!its?.length) { alert('Esta operación no tiene productos registrados.'); return; }
       await applyStockEffects(op.id, op.type, its);
       alert('Stock re-aplicado correctamente.');
       await load();
     } catch (e) { alert('Error: ' + (e.message ?? 'intenta de nuevo')); }
-    setSaving(false);
   };
 
   // ── Confirmar operación borrador ─────────────────────────
   const handleConfirmOp = async (op) => {
     if (!window.confirm(`¿Confirmar esta ${OP_TYPES[op.type]?.label}? Se actualizará el stock de todos los productos.`)) return;
-    setSaving(true);
     try {
-      const { data: its } = await supabase.from('bapesu_inventory_op_items').select('*').eq('op_id', op.id);
+      const its = await queryClient.fetchQuery({
+        queryKey: queryKeys.company.inventory.opItems(op.id),
+        queryFn: () => operationsApi.listRawItems(op.id).then(unwrapSupabaseResponse),
+      });
       await applyStockEffects(op.id, op.type, its ?? []);
       await load();
     } catch (e) { alert('Error: ' + (e.message ?? 'intenta de nuevo')); }
-    setSaving(false);
   };
 
   // ── Anular operación: si estaba confirmada, revierte el stock ──
@@ -301,16 +299,17 @@ export function useOperations() {
       ? `¿Anular ${op.reference}?\n\nSe REVERTIRÁ el efecto sobre el stock (lo que sumó se restará y viceversa).`
       : '¿Anular esta operación?';
     if (!window.confirm(msg)) return;
-    setSaving(true);
     try {
       if (willRevert) {
-        const { data: its } = await supabase.from('bapesu_inventory_op_items').select('*').eq('op_id', op.id);
+        const its = await queryClient.fetchQuery({
+          queryKey: queryKeys.company.inventory.opItems(op.id),
+          queryFn: () => operationsApi.listRawItems(op.id).then(unwrapSupabaseResponse),
+        });
         if (its?.length) await applyStockEffects(op.id, op.type, its, true);
       }
-      await supabase.from('bapesu_inventory_ops').update({ status: 'anulado', updated_at: new Date().toISOString() }).eq('id', op.id);
+      await operationsApi.update(op.id, { status: 'anulado', updated_at: new Date().toISOString() });
       await load();
     } catch (e) { alert('Error: ' + (e.message ?? 'intenta de nuevo')); }
-    setSaving(false);
   };
 
   const handleDeleteOp = async (op) => {
@@ -319,8 +318,8 @@ export function useOperations() {
       return;
     }
     if (!window.confirm('¿Eliminar esta operación?')) return;
-    await supabase.from('bapesu_inventory_op_items').delete().eq('op_id', op.id);
-    await supabase.from('bapesu_inventory_ops').delete().eq('id', op.id);
+    await operationsApi.removeItems(op.id);
+    await operationsApi.remove(op.id);
     await load();
   };
 
@@ -332,17 +331,16 @@ export function useOperations() {
 
   const handleSaveSupplier = async () => {
     if (!suppForm.name.trim()) return;
-    setSaving(true);
     const { error: e } = suppModal.mode === 'add'
-      ? await supabase.from('bapesu_suppliers').insert({ ...suppForm, company_id: company.id, is_active: true })
-      : await supabase.from('bapesu_suppliers').update({ ...suppForm, updated_at: new Date().toISOString() }).eq('id', suppModal.id);
-    if (e) { alert('Error al guardar proveedor: ' + e.message); setSaving(false); return; }
-    await load(); closeSuppModal(); setSaving(false);
+      ? await operationsApi.createSupplier({ ...suppForm, company_id: company.id, is_active: true })
+      : await operationsApi.updateSupplier(suppModal.id, { ...suppForm, updated_at: new Date().toISOString() });
+    if (e) { alert('Error al guardar proveedor: ' + e.message); return; }
+    await load(); closeSuppModal();
   };
 
   const handleDeleteSupplier = async (id) => {
     if (!window.confirm('¿Eliminar proveedor?')) return;
-    await supabase.from('bapesu_suppliers').delete().eq('id', id);
+    await operationsApi.deleteSupplier(id);
     await load();
   };
 
@@ -354,17 +352,16 @@ export function useOperations() {
 
   const handleSaveWarehouse = async () => {
     if (!whForm.name.trim()) return;
-    setSaving(true);
     const { error: e } = whModal.mode === 'add'
-      ? await supabase.from('bapesu_warehouses').insert({ ...whForm, company_id: company.id, is_active: true })
-      : await supabase.from('bapesu_warehouses').update({ ...whForm, updated_at: new Date().toISOString() }).eq('id', whModal.id);
-    if (e) { alert('Error al guardar bodega: ' + e.message); setSaving(false); return; }
-    await load(); closeWhModal(); setSaving(false);
+      ? await operationsApi.createWarehouse({ ...whForm, company_id: company.id, is_active: true })
+      : await operationsApi.updateWarehouse(whModal.id, { ...whForm, updated_at: new Date().toISOString() });
+    if (e) { alert('Error al guardar bodega: ' + e.message); return; }
+    await load(); closeWhModal();
   };
 
   const handleDeleteWarehouse = async (id) => {
     if (!window.confirm('¿Eliminar bodega?')) return;
-    await supabase.from('bapesu_warehouses').delete().eq('id', id);
+    await operationsApi.deleteWarehouse(id);
     await load();
   };
 

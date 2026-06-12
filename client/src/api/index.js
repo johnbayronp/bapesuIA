@@ -16,3 +16,5 @@ export { facturasApi }   from './facturas';
 export { remindersApi }  from './reminders';
 export { inventoryApi }  from './inventory';
 export { operationsApi } from './operations';
+export { quotationsApi } from './quotations';
+export { adminApi, superadminApi } from './admin';

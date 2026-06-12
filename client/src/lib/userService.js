@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { db } from '../api/db';
 
 // Servicio para manejar la tabla de usuarios (ahora usando UUID directamente)
 export const userService = {
@@ -12,7 +13,7 @@ export const userService = {
       console.log('UUID del usuario:', userId);
       
       // Primero verificar si el usuario ya existe
-      const { data: existingUser, error: checkError } = await supabase
+      const { data: existingUser, error: checkError } = await db
         .from('users')
         .select('id')
         .eq('id', userId)
@@ -28,7 +29,7 @@ export const userService = {
       }
 
       // Crear nuevo perfil
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .insert([
           {
@@ -78,7 +79,7 @@ export const userService = {
   async getUserProfile(userId) {
     try {
       // Usar UUID directamente sin conversión
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('*')
         .eq('id', userId)
@@ -126,7 +127,7 @@ export const userService = {
   async updateUserProfile(userId, updates) {
     try {
       // Usar UUID directamente sin conversión
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .update({
           ...updates,
@@ -151,7 +152,7 @@ export const userService = {
   async deactivateUser(userId) {
     try {
       // Usar UUID directamente sin conversión
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .update({
           is_active: false,
@@ -175,7 +176,7 @@ export const userService = {
   // Obtener todos los usuarios (para admin)
   async getAllUsers() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
@@ -196,7 +197,7 @@ export const userService = {
   async userExists(userId) {
     try {
       // Usar UUID directamente sin conversión
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('id')
         .eq('id', userId)
@@ -218,7 +219,7 @@ export const userService = {
   async getUserOrderStats(userId) {
     try {
       // Obtener todas las órdenes del usuario
-      const { data: orders, error } = await supabase
+      const { data: orders, error } = await db
         .from('orders')
         .select('*')
         .eq('user_id', userId)

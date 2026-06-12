@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { clientsApi, quotationsApi, servicesApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseCount, unwrapSupabaseResponse, unwrapSupabaseSingle } from '../../../lib/queryUtils';
 
 const formatCOP = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0,
@@ -48,40 +51,48 @@ export default function QuotationEditor() {
   const { id } = useParams();
   const isEdit = Boolean(id);
 
-  const [loading, setLoading] = useState(isEdit);
-  const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState('');
 
   const [quote, setQuote]   = useState(DEFAULT_QUOTE);
   const [items, setItems]   = useState([newItem()]);
   const [clientId, setClientId] = useState(null);
 
-  const [clients, setClients]   = useState([]);
-  const [services, setServices] = useState([]);
+  const queryClient = useQueryClient();
 
-  // Cargar catálogos
-  useEffect(() => {
-    if (!company?.id) return;
-    Promise.all([
-      supabase.from('bapesu_clients').select('id, name, nit, email, phone, city, address').eq('company_id', company.id).order('name'),
-      supabase.from('bapesu_services').select('id, name, default_price, unit, is_active').eq('company_id', company.id).eq('is_active', true).order('name'),
-    ]).then(([c, s]) => {
-      setClients(c.data ?? []);
-      setServices(s.data ?? []);
-    });
-  }, [company]);
+  const clientsQuery = useQuery({
+    queryKey: [...queryKeys.company.clients(company?.id), 'select'],
+    enabled: Boolean(company?.id),
+    queryFn: () => clientsApi.listForSelect(company.id, 'id, name, nit, email, phone, city, address').then(unwrapSupabaseResponse),
+  });
+  const servicesQuery = useQuery({
+    queryKey: [...queryKeys.company.services(company?.id), 'active-select'],
+    enabled: Boolean(company?.id),
+    queryFn: () => servicesApi.listActiveForSelect(company.id, 'id, name, default_price, unit, is_active').then(unwrapSupabaseResponse),
+  });
+  const nextNumberQuery = useQuery({
+    queryKey: [...queryKeys.company.quotations(company?.id), 'next-number'],
+    enabled: Boolean(company?.id) && !isEdit,
+    queryFn: () => quotationsApi.countByCompany(company.id).then(unwrapSupabaseCount),
+  });
+  const quotationQuery = useQuery({
+    queryKey: queryKeys.company.quotation(id),
+    enabled: Boolean(company?.id) && isEdit,
+    queryFn: async () => {
+      const [quotation, quotationItems] = await Promise.all([
+        quotationsApi.get(id).then(unwrapSupabaseSingle),
+        quotationsApi.getItems(id).then(unwrapSupabaseResponse),
+      ]);
+      return { quotation, quotationItems };
+    },
+  });
 
-  // Generar número automático para nuevas
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+  const services = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
+
   useEffect(() => {
-    if (isEdit || !company?.id) return;
-    supabase
-      .from('bapesu_quotations')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', company.id)
-      .then(({ count }) => {
-        setQuote((p) => ({ ...p, number: String((count ?? 0) + 1).padStart(3, '0') }));
-      });
-  }, [isEdit, company]);
+    if (isEdit || nextNumberQuery.data == null) return;
+    setQuote((p) => ({ ...p, number: String((nextNumberQuery.data ?? 0) + 1).padStart(3, '0') }));
+  }, [isEdit, nextNumberQuery.data]);
 
   // Pre-cargar firma con email del usuario
   useEffect(() => {
@@ -89,12 +100,10 @@ export default function QuotationEditor() {
     setQuote((p) => p.signature_name ? p : { ...p, signature_name: user.email?.split('@')[0]?.toUpperCase() ?? '' });
   }, [user, isEdit]);
 
-  // Cargar cotización existente
-  const loadQuote = useCallback(async () => {
-    if (!isEdit || !company?.id) return;
-    setLoading(true);
-    const { data: q } = await supabase
-      .from('bapesu_quotations').select('*').eq('id', id).maybeSingle();
+  // Cargar cotizaci??n existente
+  useEffect(() => {
+    if (!isEdit) return;
+    const q = quotationQuery.data?.quotation;
     if (q) {
       setQuote({
         number: q.number ?? '',
@@ -110,16 +119,12 @@ export default function QuotationEditor() {
       });
       setClientId(q.client_id ?? null);
 
-      const { data: its } = await supabase
-        .from('bapesu_quotation_items').select('*').eq('quotation_id', id).order('position');
+      const its = quotationQuery.data?.quotationItems ?? [];
       setItems(its && its.length ? its.map((i) => ({
         service_id: i.service_id, description: i.description, quantity: Number(i.quantity), price: Number(i.price), position: i.position,
       })) : [newItem()]);
     }
-    setLoading(false);
-  }, [isEdit, id, company]);
-
-  useEffect(() => { loadQuote(); }, [loadQuote]);
+  }, [quotationQuery.data, isEdit]);
 
   const setQ  = (k, v) => setQuote((p) => ({ ...p, [k]: v }));
 
@@ -148,11 +153,8 @@ export default function QuotationEditor() {
   const total    = subtotal + ivaAmt;
 
   // Guardar
-  const handleSave = async (status = quote.status) => {
-    if (!company?.id) { setError('No tienes empresa asociada'); return; }
-    setSaving(true); setError('');
-
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async (status = quote.status) => {
       const payload = {
         company_id: company.id,
         client_id: clientId,
@@ -176,47 +178,58 @@ export default function QuotationEditor() {
 
       let quotationId = id;
       if (isEdit) {
-        const { error: e } = await supabase.from('bapesu_quotations').update(payload).eq('id', id);
+        const { error: e } = await quotationsApi.update(id, payload);
         if (e) throw e;
       } else {
-        const { data, error: e } = await supabase
-          .from('bapesu_quotations')
-          .insert({ ...payload, created_by: user?.id ?? null })
-          .select('id').single();
+        const { data, error: e } = await quotationsApi.create({ ...payload, created_by: user?.id ?? null });
         if (e) throw e;
         quotationId = data.id;
       }
 
-      // Reemplazar items: borrar todos y volver a insertar
-      await supabase.from('bapesu_quotation_items').delete().eq('quotation_id', quotationId);
+      const removeRes = await quotationsApi.removeItems(quotationId);
+      if (removeRes.error) throw removeRes.error;
       const itemsPayload = items
         .filter((i) => i.description.trim() || i.price > 0)
         .map((i, idx) => ({
           quotation_id: quotationId,
           service_id: i.service_id,
-          description: i.description.trim() || 'Sin descripción',
+          description: i.description.trim() || 'Sin descripci?n',
           quantity: Number(i.quantity) || 1,
           price: Number(i.price) || 0,
           position: idx,
         }));
       if (itemsPayload.length) {
-        const { error: e } = await supabase.from('bapesu_quotation_items').insert(itemsPayload);
+        const { error: e } = await quotationsApi.addItems(itemsPayload);
         if (e) throw e;
       }
 
+      return quotationId;
+    },
+    onSuccess: async (quotationId) => {
+      await invalidateCompanyData(queryClient, company?.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.company.quotation(quotationId) });
       if (!isEdit) navigate(`/dashboard/quotations/${quotationId}`, { replace: true });
-      else await loadQuote();
+      else await quotationQuery.refetch();
+    },
+  });
 
+  const handleSave = async (status = quote.status) => {
+    if (!company?.id) { setError('No tienes empresa asociada'); return; }
+    setError('');
+
+    try {
+      await saveMutation.mutateAsync(status);
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
     }
-    setSaving(false);
   };
-
   const handlePrint = async () => {
     if (!isEdit) await handleSave();
     window.print();
   };
+
+  const loading = (isEdit && quotationQuery.isLoading) || clientsQuery.isLoading || servicesQuery.isLoading;
+  const saving = saveMutation.isPending;
 
   if (loading) {
     return (

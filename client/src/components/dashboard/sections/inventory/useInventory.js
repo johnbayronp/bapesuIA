@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
+import { queryKeys } from '../../../../lib/queryKeys';
+import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
 import { EMPTY_PRODUCT, EMPTY_CATEGORY } from './constants';
 
 export function useInventory() {
   const { user, company } = useCompany();
+  const queryClient = useQueryClient();
 
-  const [products,   setProducts]   = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [movements,  setMovements]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [deleting,   setDeleting]   = useState(null);
   const [error,      setError]      = useState('');
@@ -25,21 +25,65 @@ export function useInventory() {
   const [stockForm,    setStockForm]    = useState({ type: 'entrada', quantity: '', notes: '' });
 
   // ── Carga ───────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const [prod, cat, mov] = await Promise.all([
-      inventoryApi.listProducts(company.id),
-      inventoryApi.listCategories(company.id),
-      inventoryApi.listMovements(company.id),
-    ]);
-    setProducts(prod.data  ?? []);
-    setCategories(cat.data ?? []);
-    setMovements(mov.data  ?? []);
-    setLoading(false);
-  }, [company]);
+  const productsQuery = useQuery({
+    queryKey: queryKeys.company.inventory.products(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => inventoryApi.listProducts(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const categoriesQuery = useQuery({
+    queryKey: queryKeys.company.inventory.categories(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => inventoryApi.listCategories(company.id).then(unwrapSupabaseResponse),
+  });
+
+  const movementsQuery = useQuery({
+    queryKey: queryKeys.company.inventory.movements(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => inventoryApi.listMovements(company.id).then(unwrapSupabaseResponse),
+  });
+
+  const products = productsQuery.data ?? EMPTY_ARRAY;
+  const categories = categoriesQuery.data ?? EMPTY_ARRAY;
+  const movements = movementsQuery.data ?? EMPTY_ARRAY;
+  const loading = productsQuery.isLoading || categoriesQuery.isLoading || movementsQuery.isLoading;
+  const load = () => invalidateCompanyData(queryClient, company?.id);
+
+  const productMutation = useMutation({
+    mutationFn: async ({ action, id, payload }) => {
+      const response = action === 'create'
+        ? await inventoryApi.createProduct(payload)
+        : action === 'delete'
+        ? await inventoryApi.deleteProduct(id)
+        : await inventoryApi.updateProduct(id, payload);
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: load,
+  });
+
+  const categoryMutation = useMutation({
+    mutationFn: async ({ action, id, payload }) => {
+      const response = action === 'create'
+        ? await inventoryApi.createCategory(payload)
+        : action === 'delete'
+        ? await inventoryApi.deleteCategory(id)
+        : await inventoryApi.updateCategory(id, payload);
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: load,
+  });
+
+  const stockMutation = useMutation({
+    mutationFn: async ({ productId, stockPayload, movementPayload }) => {
+      const productResponse = await inventoryApi.updateProduct(productId, stockPayload);
+      if (productResponse.error) throw productResponse.error;
+      const movementResponse = await inventoryApi.addMovement(movementPayload);
+      if (movementResponse.error) throw movementResponse.error;
+    },
+    onSuccess: load,
+  });
 
   // ── Helpers de form ─────────────────────────────────────────
   const setPF = (k, v) => setProductForm((p)  => ({ ...p, [k]: v }));
@@ -103,13 +147,13 @@ export function useInventory() {
         updated_at:       new Date().toISOString(),
       };
       if (productModal.mode === 'add') {
-        const { error: e } = await inventoryApi.createProduct({ ...payload, company_id: company.id, created_by: user?.id ?? null });
-        if (e) throw e;
+        await productMutation.mutateAsync({
+          action: 'create',
+          payload: { ...payload, company_id: company.id, created_by: user?.id ?? null },
+        });
       } else {
-        const { error: e } = await inventoryApi.updateProduct(productModal.id, payload);
-        if (e) throw e;
+        await productMutation.mutateAsync({ action: 'update', id: productModal.id, payload });
       }
-      await load();
       closeProductModal();
     } catch (e) { setError(e.message ?? 'Error al guardar'); }
     setSaving(false);
@@ -118,14 +162,12 @@ export function useInventory() {
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('¿Eliminar este producto?')) return;
     setDeleting(id);
-    await inventoryApi.deleteProduct(id);
-    await load();
+    await productMutation.mutateAsync({ action: 'delete', id });
     setDeleting(null);
   };
 
   const handleToggleProduct = async (p) => {
-    await inventoryApi.updateProduct(p.id, { is_active: !p.is_active });
-    await load();
+    await productMutation.mutateAsync({ action: 'update', id: p.id, payload: { is_active: !p.is_active } });
   };
 
   // ── Modal Categoría ─────────────────────────────────────────
@@ -152,13 +194,10 @@ export function useInventory() {
         parent_id:   categoryForm.parent_id || null,
       };
       if (categoryModal.mode === 'add') {
-        const { error: e } = await inventoryApi.createCategory({ ...payload, company_id: company.id });
-        if (e) throw e;
+        await categoryMutation.mutateAsync({ action: 'create', payload: { ...payload, company_id: company.id } });
       } else {
-        const { error: e } = await inventoryApi.updateCategory(categoryModal.id, payload);
-        if (e) throw e;
+        await categoryMutation.mutateAsync({ action: 'update', id: categoryModal.id, payload });
       }
-      await load();
       closeCategoryModal();
     } catch (e) { setError(e.message ?? 'Error al guardar'); }
     setSaving(false);
@@ -166,8 +205,7 @@ export function useInventory() {
 
   const handleDeleteCategory = async (id) => {
     if (!window.confirm('¿Eliminar esta categoría? Los productos vinculados quedarán sin categoría.')) return;
-    await inventoryApi.deleteCategory(id);
-    await load();
+    await categoryMutation.mutateAsync({ action: 'delete', id });
   };
 
   // ── Modal Stock ─────────────────────────────────────────────
@@ -191,16 +229,18 @@ export function useInventory() {
         ? Math.max(+((current - qty).toFixed(3)), 0)
         : +qty.toFixed(3); // ajuste directo
 
-      await inventoryApi.updateProduct(p.id, { stock_available: newStock, updated_at: new Date().toISOString() });
-      await inventoryApi.addMovement({
-        company_id: company.id,
-        product_id: p.id,
-        type:       stockForm.type,
-        quantity:   stockForm.type === 'salida' ? -qty : qty,
-        notes:      stockForm.notes.trim() || null,
-        created_by: user?.id ?? null,
+      await stockMutation.mutateAsync({
+        productId: p.id,
+        stockPayload: { stock_available: newStock, updated_at: new Date().toISOString() },
+        movementPayload: {
+          company_id: company.id,
+          product_id: p.id,
+          type:       stockForm.type,
+          quantity:   stockForm.type === 'salida' ? -qty : qty,
+          notes:      stockForm.notes.trim() || null,
+          created_by: user?.id ?? null,
+        },
       });
-      await load();
       closeStockModal();
     } catch (e) { setError(e.message ?? 'Error al ajustar stock'); }
     setSaving(false);

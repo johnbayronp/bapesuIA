@@ -13,6 +13,20 @@ export const invoicesApi = {
       .eq('id', id)
       .single(),
 
+  get: (id) =>
+    db.from('bapesu_invoices').select('*').eq('id', id).maybeSingle(),
+
+  countByCompany: (companyId) =>
+    db.from('bapesu_invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId),
+
+  getItems: (id) =>
+    db.from('bapesu_invoice_items')
+      .select('*')
+      .eq('invoice_id', id)
+      .order('position'),
+
   create: (payload) =>
     db.from('bapesu_invoices').insert(payload).select().single(),
 

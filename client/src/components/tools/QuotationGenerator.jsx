@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import useToast from '../../hooks/useToast';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { supabase } from '../../lib/supabase';
+import { db } from '../../api/db';
 
 const STORAGE_KEY    = 'bapesu-cotizacion';
 const SESSION_KEY    = 'cotizacion-unlocked';
@@ -82,7 +83,7 @@ export default function QuotationGenerator() {
     }
     setReqLoading('loading');
     try {
-      await supabase.from('cotizacion_access_requests').insert({ email, requested_at: new Date().toISOString() });
+      await db.from('cotizacion_access_requests').insert({ email, requested_at: new Date().toISOString() });
     } catch { /* tabla puede no existir aún, ignorar */ }
     setReqLoading('done');
   };
@@ -111,11 +112,11 @@ export default function QuotationGenerator() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
 
-        const { data: profile } = await supabase
+        const { data: profile } = await db
           .from('users').select('company_id').eq('id', user.id).maybeSingle();
         if (!profile?.company_id || cancelled) return;
 
-        const { data: comp } = await supabase
+        const { data: comp } = await db
           .from('bapesu_companies').select('*').eq('id', profile.company_id).maybeSingle();
         if (!comp || cancelled) return;
 

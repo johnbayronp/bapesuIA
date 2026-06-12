@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { superadminApi } from '../../api';
+import { queryKeys } from '../../lib/queryKeys';
+import { unwrapSupabaseResponse } from '../../lib/queryUtils';
 
 const ALL_MODULES = [
   { id: 'clientes',    label: 'Clientes' },
@@ -15,20 +18,26 @@ const ALL_MODULES = [
 const formatCOP = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
 
 export default function SAPlans() {
-  const [plans,  setPlans]  = useState([]);
-  const [loading,setLoading]= useState(true);
+  const queryClient = useQueryClient();
   const [modal,  setModal]  = useState(null);
   const [form,   setForm]   = useState({});
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase.from('bapesu_plans').select('*').order('price_cop');
-    setPlans(data ?? []);
-    setLoading(false);
-  }, []);
+  const plansQuery = useQuery({
+    queryKey: queryKeys.superadmin.plans,
+    queryFn: () => superadminApi.listPlans().then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const plans = plansQuery.data ?? [];
+  const loading = plansQuery.isLoading;
+
+  const updatePlanMutation = useMutation({
+    mutationFn: async ({ id, payload }) => {
+      const response = await superadminApi.updatePlan(id, payload);
+      if (response.error) throw response.error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.superadmin.plans }),
+  });
 
   const openEdit = (plan) => {
     setForm({ ...plan, modules: [...(plan.modules ?? [])] });
@@ -46,7 +55,7 @@ export default function SAPlans() {
 
   const handleSave = async () => {
     setSaving(true);
-    await supabase.from('bapesu_plans').update({
+    await updatePlanMutation.mutateAsync({ id: modal.id, payload: {
       name:         form.name,
       description:  form.description,
       price_cop:    Number(form.price_cop ?? 0),
@@ -55,10 +64,9 @@ export default function SAPlans() {
       max_products: Number(form.max_products ?? 0),
       modules:      form.modules,
       updated_at:   new Date().toISOString(),
-    }).eq('id', modal.id);
+    }});
     setSaving(false);
     setModal(null);
-    load();
   };
 
   const PLAN_COLORS = {

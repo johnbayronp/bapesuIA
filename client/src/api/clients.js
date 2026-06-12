@@ -5,6 +5,12 @@ export const clientsApi = {
     db.from('bapesu_clients')
       .select('*')
       .eq('company_id', companyId)
+      .order('created_at', { ascending: false }),
+
+  listForSelect: (companyId, columns = '*') =>
+    db.from('bapesu_clients')
+      .select(columns)
+      .eq('company_id', companyId)
       .order('name'),
 
   create: (payload) =>

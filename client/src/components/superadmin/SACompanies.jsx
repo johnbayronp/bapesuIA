@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase, supabaseAuxAuth } from '../../lib/supabase';
+import { useMemo, useState, useEffect } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabaseAuxAuth } from '../../lib/supabase';
+import { superadminApi } from '../../api';
+import { queryKeys } from '../../lib/queryKeys';
 
 const PLANS = ['free', 'pro', 'enterprise'];
 const PLAN_META = {
@@ -17,8 +20,7 @@ function genPassword(len = 12) {
 }
 
 export default function SACompanies() {
-  const [companies,    setCompanies]    = useState([]);
-  const [loading,      setLoading]      = useState(true);
+  const queryClient = useQueryClient();
   const [search,       setSearch]       = useState('');
   const [planFilter,   setPlanFilter]   = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -27,7 +29,6 @@ export default function SACompanies() {
   const [modal,        setModal]        = useState(null);
   const [form,         setForm]         = useState(EMPTY);
   const [saving,       setSaving]       = useState(false);
-  const [userCounts,   setUserCounts]   = useState({});
   // Modal crear usuario
   const [userModal,    setUserModal]    = useState(null); // company object
   const [userForm,     setUserForm]     = useState(EMPTY_USER);
@@ -36,22 +37,37 @@ export default function SACompanies() {
   const [userCreated,  setUserCreated]  = useState(null); // { email, password }
   const [showPwd,      setShowPwd]      = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [{ data }, { data: users }] = await Promise.all([
-      supabase.from('bapesu_companies').select('*').order('created_at', { ascending: false }),
-      supabase.from('users').select('company_id'),
-    ]);
-    setCompanies(data ?? []);
-    const counts = (users ?? []).reduce((acc, u) => {
+  const companiesQuery = useQuery({
+    queryKey: queryKeys.superadmin.companies,
+    queryFn: superadminApi.listCompanies,
+  });
+
+  const companies = companiesQuery.data?.companies ?? [];
+  const loading = companiesQuery.isLoading;
+  const userCounts = useMemo(() => (companiesQuery.data?.users ?? []).reduce((acc, u) => {
       if (u.company_id) acc[u.company_id] = (acc[u.company_id] || 0) + 1;
       return acc;
-    }, {});
-    setUserCounts(counts);
-    setLoading(false);
-  }, []);
+    }, {}), [companiesQuery.data?.users]);
 
-  useEffect(() => { load(); }, [load]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.superadmin.companies });
+
+  const companyMutation = useMutation({
+    mutationFn: async ({ action, id, payload }) => {
+      const response = action === 'create'
+        ? await superadminApi.createCompany(payload)
+        : await superadminApi.updateCompany(id, payload);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const assignUserMutation = useMutation({
+    mutationFn: async ({ userId, companyId, role }) => {
+      const response = await superadminApi.assignUserToCompany(userId, companyId, role);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
 
   // ── Filtros + sort ───────────────────────────────────────────────
   const filtered = companies
@@ -91,23 +107,20 @@ export default function SACompanies() {
   const handleSave = async () => {
     setSaving(true);
     if (modal === 'new') {
-      await supabase.from('bapesu_companies').insert({ ...form });
+      await companyMutation.mutateAsync({ action: 'create', payload: { ...form } });
     } else {
-      await supabase.from('bapesu_companies').update({ ...form, updated_at: new Date().toISOString() }).eq('id', modal.id);
+      await companyMutation.mutateAsync({ action: 'update', id: modal.id, payload: { ...form, updated_at: new Date().toISOString() } });
     }
     setSaving(false);
     setModal(null);
-    load();
   };
 
   const handleToggle = async (c) => {
-    await supabase.from('bapesu_companies').update({ is_active: !c.is_active }).eq('id', c.id);
-    load();
+    await companyMutation.mutateAsync({ action: 'update', id: c.id, payload: { is_active: !c.is_active } });
   };
 
   const handleChangePlan = async (id, plan) => {
-    await supabase.from('bapesu_companies').update({ plan, updated_at: new Date().toISOString() }).eq('id', id);
-    load();
+    await companyMutation.mutateAsync({ action: 'update', id, payload: { plan, updated_at: new Date().toISOString() } });
   };
 
   const openUserModal = (company) => {
@@ -137,15 +150,9 @@ export default function SACompanies() {
 
       await supabaseAuxAuth.auth.signOut();
 
-      const { error: rpcErr } = await supabase.rpc('superadmin_assign_user_to_company', {
-        p_user_id:    data.user.id,
-        p_company_id: userModal.id,
-        p_role:       userForm.role,
-      });
-      if (rpcErr) throw rpcErr;
+      await assignUserMutation.mutateAsync({ userId: data.user.id, companyId: userModal.id, role: userForm.role });
 
       setUserCreated({ email: userForm.email.trim(), password: userForm.password });
-      load();
     } catch (e) {
       setUserError(e.message ?? 'Error al crear el usuario');
     }

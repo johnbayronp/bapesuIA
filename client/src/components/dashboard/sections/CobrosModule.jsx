@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { facturasApi, invoicesApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { useConvertInvoiceToFactura } from '../../../hooks/useInvoices';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/queryUtils';
 
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
@@ -33,37 +37,69 @@ const TABS = [
   },
 ];
 
-const FACTURA_PREFIX = 'FAC';
-
 export default function CobrosModule() {
   const { company } = useCompany();
   const navigate    = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activeTab = searchParams.get('tab') === 'facturas' ? 'facturas' : 'invoices';
   const setTab    = (t) => setSearchParams({ tab: t }, { replace: true });
 
   // ── Estado compartido ─────────────────────────────────────────────
-  const [invoices,  setInvoices]  = useState([]);
-  const [facturas,  setFacturas]  = useState([]);
-  const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatus] = useState('all');
   const [deleting,  setDeleting]  = useState(null);
 
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const [inv, fac] = await Promise.all([
-      supabase.from('bapesu_invoices').select('*').eq('company_id', company.id).order('created_at', { ascending: false }),
-      supabase.from('bapesu_facturas').select('id,prefix,number,issue_date,due_date,client_name,client_nit,total,status').eq('company_id', company.id).order('created_at', { ascending: false }),
-    ]);
-    setInvoices(inv.data ?? []);
-    setFacturas(fac.data ?? []);
-    setLoading(false);
-  }, [company]);
+  const invoicesQuery = useQuery({
+    queryKey: queryKeys.company.invoices(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => invoicesApi.list(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const facturasQuery = useQuery({
+    queryKey: queryKeys.company.facturas(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => facturasApi.list(company.id).then(unwrapSupabaseResponse),
+  });
+
+  const invoices = invoicesQuery.data ?? [];
+  const facturas = facturasQuery.data ?? [];
+  const loading = invoicesQuery.isLoading || facturasQuery.isLoading;
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
+  const convertInvoice = useConvertInvoiceToFactura(company?.id);
+
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await invoicesApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const deleteFacturaMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await facturasApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const updateInvoiceStatusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      const response = await invoicesApi.update(id, { status, updated_at: new Date().toISOString() });
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const updateFacturaStatusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      const response = await facturasApi.update(id, { status, updated_at: new Date().toISOString() });
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
 
   // Reset filtros al cambiar de tab
   useEffect(() => { setSearch(''); setStatus('all'); }, [activeTab]);
@@ -73,8 +109,7 @@ export default function CobrosModule() {
     e.stopPropagation();
     if (!window.confirm('¿Eliminar esta cuenta de cobro?')) return;
     setDeleting(id);
-    await supabase.from('bapesu_invoices').delete().eq('id', id);
-    await load();
+    await deleteInvoiceMutation.mutateAsync(id);
     setDeleting(null);
   };
 
@@ -82,29 +117,7 @@ export default function CobrosModule() {
     e.stopPropagation();
     if (!window.confirm(`¿Convertir cuenta de cobro #${inv.number} a factura?\nSe creará pre-llenada con los mismos datos.`)) return;
     try {
-      const { data: items } = await supabase.from('bapesu_invoice_items').select('*').eq('invoice_id', inv.id).order('position');
-      const { count } = await supabase.from('bapesu_facturas').select('id', { count: 'exact', head: true }).eq('company_id', company.id);
-      const newNumber = String((count ?? 0) + 1).padStart(3, '0');
-      const { data: newFac, error } = await supabase.from('bapesu_facturas').insert({
-        company_id: company.id, client_id: inv.client_id,
-        client_name: inv.client_name, client_nit: inv.client_nit,
-        client_email: inv.client_email, client_phone: inv.client_phone, client_address: inv.client_address,
-        prefix: FACTURA_PREFIX, number: newNumber,
-        issue_date: inv.issue_date, due_date: inv.due_date,
-        concept: inv.concept, notes: inv.notes, payment_info: inv.payment_info,
-        include_iva: inv.include_iva, iva_rate: inv.iva_rate,
-        include_retefuente: inv.include_retefuente, retefuente_rate: inv.retefuente_rate,
-        include_reteiva: false, reteiva_rate: 15, include_reteica: false, reteica_rate: 0.414,
-        subtotal: inv.subtotal, iva_amount: inv.iva_amount,
-        retefuente_amount: inv.retefuente_amount, reteiva_amount: 0, reteica_amount: 0,
-        total: inv.total, status: 'draft',
-      }).select('id').single();
-      if (error) throw error;
-      if (items?.length) {
-        await supabase.from('bapesu_factura_items').insert(
-          items.map((it) => ({ factura_id: newFac.id, service_id: it.service_id, description: it.description, quantity: it.quantity, price: it.price, position: it.position }))
-        );
-      }
+      const newFac = await convertInvoice.mutateAsync(inv);
       navigate(`/dashboard/cobros/facturas/${newFac.id}`);
     } catch (err) { alert('Error: ' + (err.message ?? 'intenta de nuevo')); }
   };
@@ -114,27 +127,24 @@ export default function CobrosModule() {
     e.stopPropagation();
     if (!window.confirm('¿Eliminar esta factura?')) return;
     setDeleting(id);
-    await supabase.from('bapesu_facturas').delete().eq('id', id);
-    await load();
+    await deleteFacturaMutation.mutateAsync(id);
     setDeleting(null);
   };
 
   const handleFacturaStatus = async (id, status, e) => {
     e.stopPropagation();
-    await supabase.from('bapesu_facturas').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
-    await load();
+    await updateFacturaStatusMutation.mutateAsync({ id, status });
   };
 
   const handleInvoiceStatus = async (id, status, e) => {
     e.stopPropagation();
-    await supabase.from('bapesu_invoices').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
-    await load();
+    await updateInvoiceStatusMutation.mutateAsync({ id, status });
   };
 
   // ── Datos del tab activo ──────────────────────────────────────────
   const tab    = TABS.find((t) => t.id === activeTab);
   const list   = activeTab === 'invoices' ? invoices : facturas;
-  const filtered = list.filter((d) => {
+  const filtered = useMemo(() => list.filter((d) => {
     if (statusFilter !== 'all' && d.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -146,7 +156,7 @@ export default function CobrosModule() {
       );
     }
     return true;
-  });
+  }), [list, search, statusFilter]);
 
   // KPIs unificados (ambos tabs)
   const today     = new Date().toISOString().slice(0, 10);

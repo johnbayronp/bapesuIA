@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { quotationsApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/queryUtils';
 
 const formatCOP = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0,
@@ -17,65 +20,80 @@ const STATUS = {
 export default function QuotationsList() {
   const { company } = useCompany();
   const navigate = useNavigate();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [deleting, setDeleting] = useState(null);
 
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('bapesu_quotations')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false });
-    setList(data ?? []);
-    setLoading(false);
-  }, [company]);
+  const quotationsQuery = useQuery({
+    queryKey: queryKeys.company.quotations(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => quotationsApi.list(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const list = quotationsQuery.data ?? [];
+  const loading = quotationsQuery.isLoading;
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await quotationsApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (quotation) => {
+      const itemsResponse = await quotationsApi.getItems(quotation.id);
+      if (itemsResponse.error) throw itemsResponse.error;
+      const quotationResponse = await quotationsApi.create({
+        ...quotation,
+        id: undefined,
+        number: quotation.number ? `${quotation.number}-COPY` : null,
+        status: 'draft',
+        created_at: undefined,
+        updated_at: undefined,
+      });
+      if (quotationResponse.error) throw quotationResponse.error;
+      const items = itemsResponse.data ?? [];
+      if (items.length) {
+        const insertResponse = await quotationsApi.addItems(
+          items.map((item) => ({
+            ...item,
+            id: undefined,
+            quotation_id: quotationResponse.data.id,
+            created_at: undefined,
+          }))
+        );
+        if (insertResponse.error) throw insertResponse.error;
+      }
+      return quotationResponse.data;
+    },
+    onSuccess: invalidate,
+  });
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm('¿Eliminar esta cotización? Esta acción no se puede deshacer.')) return;
     setDeleting(id);
-    await supabase.from('bapesu_quotations').delete().eq('id', id);
-    await load();
+    await deleteMutation.mutateAsync(id);
     setDeleting(null);
   };
 
   const handleDuplicate = async (q, e) => {
     e.stopPropagation();
-    const { data: items } = await supabase.from('bapesu_quotation_items').select('*').eq('quotation_id', q.id);
-    const { data: newQ, error } = await supabase
-      .from('bapesu_quotations')
-      .insert({
-        ...q,
-        id: undefined,
-        number: q.number ? `${q.number}-COPY` : null,
-        status: 'draft',
-        created_at: undefined,
-        updated_at: undefined,
-      })
-      .select('id').single();
-    if (error || !newQ) return;
-    if (items?.length) {
-      await supabase.from('bapesu_quotation_items').insert(
-        items.map((i) => ({ ...i, id: undefined, quotation_id: newQ.id, created_at: undefined }))
-      );
-    }
+    const newQ = await duplicateMutation.mutateAsync(q);
     navigate(`/dashboard/quotations/${newQ.id}`);
   };
 
-  const filtered = list
+  const filtered = useMemo(() => list
     .filter((q) => filter === 'all' || q.status === filter)
     .filter((q) =>
       [q.number, q.client_name, q.project_type].some((v) =>
         (v ?? '').toLowerCase().includes(search.toLowerCase())
       )
-    );
+    ), [list, filter, search]);
 
   return (
     <div className="max-w-6xl mx-auto">

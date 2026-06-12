@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { clientsApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
+import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/queryUtils';
 
 const EMPTY = { name: '', nit: '', email: '', phone: '', city: '', address: '', notes: '' };
 
@@ -9,28 +12,41 @@ const LABEL = 'block text-xs font-medium text-gray-600 mb-1';
 
 export default function ClientsManager() {
   const { user, company } = useCompany();
-  const [clients, setClients]     = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch]       = useState('');
   const [modal, setModal]         = useState(null); // null | { mode: 'add'|'edit', data }
-  const [saving, setSaving]       = useState(false);
   const [deleting, setDeleting]   = useState(null);
   const [error, setError]         = useState('');
   const [form, setForm]           = useState(EMPTY);
 
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('bapesu_clients')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false });
-    setClients(data ?? []);
-    setLoading(false);
-  }, [company]);
+  const clientsQuery = useQuery({
+    queryKey: queryKeys.company.clients(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => clientsApi.list(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const clients = clientsQuery.data ?? EMPTY_ARRAY;
+  const loading = clientsQuery.isLoading;
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ mode, id, payload }) => {
+      const response = mode === 'add'
+        ? await clientsApi.create({ ...payload, company_id: company.id, user_id: user?.id ?? null })
+        : await clientsApi.update(id, { ...payload, updated_at: new Date().toISOString() });
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: invalidate,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await clientsApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
 
   const openAdd  = () => { setForm(EMPTY); setError(''); setModal({ mode: 'add' }); };
   const openEdit = (c) => { setForm({ name: c.name, nit: c.nit ?? '', email: c.email ?? '', phone: c.phone ?? '', city: c.city ?? '', address: c.address ?? '', notes: c.notes ?? '' }); setError(''); setModal({ mode: 'edit', id: c.id }); };
@@ -41,42 +57,29 @@ export default function ClientsManager() {
   const handleSave = async () => {
     if (!form.name.trim()) { setError('El nombre es obligatorio'); return; }
     if (!company?.id)      { setError('No tienes una empresa asociada'); return; }
-    setSaving(true);
     setError('');
     try {
-      if (modal.mode === 'add') {
-        const { error: e } = await supabase
-          .from('bapesu_clients')
-          .insert({ ...form, company_id: company.id, user_id: user?.id ?? null });
-        if (e) throw e;
-      } else {
-        const { error: e } = await supabase
-          .from('bapesu_clients')
-          .update({ ...form, updated_at: new Date().toISOString() })
-          .eq('id', modal.id);
-        if (e) throw e;
-      }
-      await load();
+      await saveMutation.mutateAsync({ mode: modal.mode, id: modal.id, payload: form });
       closeModal();
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
     }
-    setSaving(false);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar este cliente? Esta acción no se puede deshacer.')) return;
     setDeleting(id);
-    await supabase.from('bapesu_clients').delete().eq('id', id);
-    await load();
+    await deleteMutation.mutateAsync(id);
     setDeleting(null);
   };
 
-  const filtered = clients.filter((c) =>
+  const saving = saveMutation.isPending;
+
+  const filtered = useMemo(() => clients.filter((c) =>
     [c.name, c.nit, c.email, c.phone, c.city].some((v) =>
       (v ?? '').toLowerCase().includes(search.toLowerCase())
     )
-  );
+  ), [clients, search]);
 
   return (
     <div className="max-w-5xl mx-auto">

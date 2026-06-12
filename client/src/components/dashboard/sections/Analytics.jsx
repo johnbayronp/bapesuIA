@@ -1,6 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { db } from '../../../api/db';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
 
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
@@ -108,43 +110,48 @@ function MiniBar({ data, maxVal, color = '#f59e0b' }) {
 
 export default function Analytics() {
   const { company } = useCompany();
-  const [loading,    setLoading]    = useState(true);
-  const [invoices,   setInvoices]   = useState([]);
-  const [facturas,   setFacturas]   = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [clients,    setClients]    = useState([]);
-  const [services,   setServices]   = useState([]);
-  const [products,   setProducts]   = useState([]);
-  const [movements,  setMovements]  = useState([]);
-
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
+  const analyticsQuery = useQuery({
+    queryKey: queryKeys.company.analytics(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: async () => {
     const thisMonthStart = new Date().toISOString().slice(0, 7) + '-01';
     const [inv, fac, quo, cli, svc, prod, mov] = await Promise.all([
-      supabase.from('bapesu_invoices').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
-      supabase.from('bapesu_facturas').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
-      supabase.from('bapesu_quotations').select('id,total,status,issue_date,client_name').eq('company_id', company.id),
-      supabase.from('bapesu_clients').select('id,name,created_at').eq('company_id', company.id),
-      supabase.from('bapesu_services').select('id,name,default_price,is_active').eq('company_id', company.id),
-      supabase.from('bapesu_products').select('id,name,stock_available,stock_min,purchase_price,sale_price,is_active').eq('company_id', company.id),
-      supabase.from('bapesu_stock_movements')
+      db.from('bapesu_invoices').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
+      db.from('bapesu_facturas').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
+      db.from('bapesu_quotations').select('id,total,status,issue_date,client_name').eq('company_id', company.id),
+      db.from('bapesu_clients').select('id,name,created_at').eq('company_id', company.id),
+      db.from('bapesu_services').select('id,name,default_price,is_active').eq('company_id', company.id),
+      db.from('bapesu_products').select('id,name,stock_available,stock_min,purchase_price,sale_price,is_active').eq('company_id', company.id),
+      db.from('bapesu_stock_movements')
         .select('quantity,type,bapesu_products!product_id(purchase_price)')
         .eq('company_id', company.id)
         .eq('type', 'salida')
         .gte('created_at', thisMonthStart),
     ]);
-    setInvoices(inv.data   ?? []);
-    setFacturas(fac.data   ?? []);
-    setQuotations(quo.data ?? []);
-    setClients(cli.data    ?? []);
-    setServices(svc.data   ?? []);
-    setProducts(prod.data  ?? []);
-    setMovements(mov.data  ?? []);
-    setLoading(false);
-  }, [company]);
+      const error = [inv, fac, quo, cli, svc, prod, mov].find((res) => res.error)?.error;
+      if (error) throw error;
+      return {
+        invoices: inv.data ?? [],
+        facturas: fac.data ?? [],
+        quotations: quo.data ?? [],
+        clients: cli.data ?? [],
+        services: svc.data ?? [],
+        products: prod.data ?? [],
+        movements: mov.data ?? [],
+      };
+    },
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const {
+    invoices = [],
+    facturas = [],
+    quotations = [],
+    clients = [],
+    services = [],
+    products = [],
+    movements = [],
+  } = analyticsQuery.data ?? {};
+  const loading = analyticsQuery.isLoading;
 
   // ── Métricas ──────────────────────────────────────────────────
   const today      = new Date().toISOString().slice(0, 10);
@@ -241,7 +248,6 @@ export default function Analytics() {
     const slot = last6.find((s) => s.month === d.getMonth() && s.year === d.getFullYear());
     if (slot) slot.value += Number(inv.total);
   });
-  const maxRevenue = Math.max(...last6.map((s) => s.value), 1);
 
   // ── Cotizaciones por mes (últimos 6) ─────────────────────────
   const last6q = Array.from({ length: 6 }, (_, i) => {
@@ -301,7 +307,7 @@ export default function Analytics() {
           <p className="text-sm text-gray-500 mt-0.5">Resumen de actividad de {company?.name}</p>
         </div>
         <button
-          onClick={load}
+          onClick={() => analyticsQuery.refetch()}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition disabled:opacity-50"
         >

@@ -5,6 +5,13 @@ export const servicesApi = {
     db.from('bapesu_services')
       .select('*')
       .eq('company_id', companyId)
+      .order('created_at', { ascending: false }),
+
+  listActiveForSelect: (companyId, columns = '*') =>
+    db.from('bapesu_services')
+      .select(columns)
+      .eq('company_id', companyId)
+      .eq('is_active', true)
       .order('name'),
 
   create: (payload) =>

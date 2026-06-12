@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { db } from '../../api/db';
 
 const AdminMiddleware = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -20,7 +21,7 @@ const AdminMiddleware = ({ children }) => {
         }
 
         // Verificar si el usuario es admin
-        const { data: profile, error } = await supabase
+        const { data: profile, error } = await db
           .from('users')
           .select('role')
           .eq('id', session.user.id)
