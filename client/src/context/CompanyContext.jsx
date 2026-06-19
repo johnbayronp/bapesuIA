@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { db } from '../api/db';
 
@@ -31,9 +31,10 @@ export function CompanyProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
+  const hasLoadedOnce = useRef(false);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async ({ silent = false } = {}) => {
+    if (!silent && !hasLoadedOnce.current) setLoading(true);
     try {
       const { data: { user: u } } = await supabase.auth.getUser();
       setUser(u ?? null);
@@ -68,13 +69,20 @@ export function CompanyProvider({ children }) {
       console.error('CompanyContext load error:', err);
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, []);
 
   useEffect(() => {
     loadAll();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadAll();
+    const silentEvents = new Set(['TOKEN_REFRESHED', 'INITIAL_SESSION']);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        hasLoadedOnce.current = false;
+        loadAll();
+        return;
+      }
+      loadAll({ silent: silentEvents.has(event) || hasLoadedOnce.current });
     });
     return () => subscription.unsubscribe();
   }, [loadAll]);
@@ -86,7 +94,7 @@ export function CompanyProvider({ children }) {
       .from('users')
       .update({ company_id: companyId, updated_at: new Date().toISOString() })
       .eq('id', user.id);
-    await loadAll();
+    await loadAll({ silent: true });
   };
 
   const isSuperAdmin = profile?.role === 'superadmin';

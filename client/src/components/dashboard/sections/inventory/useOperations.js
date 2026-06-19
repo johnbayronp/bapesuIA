@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { operationsApi, inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseCount, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
+import { persistOperationsUi, readOperationsUi } from './modalStorage';
 
 // Alias para queries puntuales que no justifican un método en la capa api aún
 const PREFIX = { entrada: 'ENT', salida: 'SAL', traslado: 'TRF', conteo: 'CNT' };
@@ -30,19 +31,32 @@ export const OP_TYPES = {
 
 export function useOperations() {
   const { user, company } = useCompany();
+  const storedUi = readOperationsUi(company?.id);
 
   const [error,      setError]      = useState('');
   const queryClient = useQueryClient();
 
-  const [opModal, setOpModal]     = useState(null);
-  const [opForm,  setOpForm]      = useState(EMPTY_OP);
-  const [items,   setItems]       = useState([{ ...EMPTY_ITEM }]);
+  const [opModal, setOpModal]     = useState(storedUi?.opModal ?? null);
+  const [opForm,  setOpForm]      = useState(storedUi?.opForm ?? EMPTY_OP);
+  const [items,   setItems]       = useState(storedUi?.items ?? [{ ...EMPTY_ITEM }]);
 
   // Modales proveedores / bodegas
-  const [suppModal, setSuppModal] = useState(null); // null | { mode:'add'|'edit', id? }
-  const [suppForm,  setSuppForm]  = useState({ name:'', nit:'', contact:'', email:'', phone:'', address:'', notes:'' });
-  const [whModal,   setWhModal]   = useState(null);
-  const [whForm,    setWhForm]    = useState({ name:'', address:'', description:'' });
+  const [suppModal, setSuppModal] = useState(storedUi?.suppModal ?? null);
+  const [suppForm,  setSuppForm]  = useState(storedUi?.suppForm ?? { name:'', nit:'', contact:'', email:'', phone:'', address:'', notes:'' });
+  const [whModal,   setWhModal]   = useState(storedUi?.whModal ?? null);
+  const [whForm,    setWhForm]    = useState(storedUi?.whForm ?? { name:'', address:'', description:'' });
+
+  useEffect(() => {
+    persistOperationsUi(company?.id, {
+      opModal,
+      opForm,
+      items,
+      suppModal,
+      suppForm,
+      whModal,
+      whForm,
+    });
+  }, [company?.id, opModal, opForm, items, suppModal, suppForm, whModal, whForm]);
 
   const operationsQuery = useQuery({
     queryKey: queryKeys.company.inventory.operations(company?.id),

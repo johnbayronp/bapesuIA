@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInventory } from './useInventory';
 import { useOperations } from './useOperations';
@@ -25,7 +25,13 @@ const TABS = [
 export default function InventoryModule() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = TABS.find((t) => t.id === searchParams.get('tab'))?.id ?? 'products';
-  const setTab    = (id) => setSearchParams({ tab: id }, { replace: true });
+  const setTab = (id) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', id);
+      return next;
+    }, { replace: true });
+  };
 
   const inv = useInventory();
   const ops = useOperations();

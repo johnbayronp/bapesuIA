@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clientsApi, invoicesApi, servicesApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { evictNewEditorCache } from '../routeCacheApi';
 import { queryKeys } from '../../../lib/queryKeys';
 import { invalidateCompanyData, unwrapSupabaseCount, unwrapSupabaseResponse, unwrapSupabaseSingle } from '../../../lib/queryUtils';
 
@@ -198,8 +199,12 @@ export default function InvoiceEditor() {
     onSuccess: async (invoiceId) => {
       await invalidateCompanyData(queryClient, company?.id);
       await queryClient.invalidateQueries({ queryKey: queryKeys.company.invoice(invoiceId) });
-      if (!isEdit) navigate(`/dashboard/cobros/invoices/${invoiceId}`, { replace: true });
-      else await invoiceQuery.refetch();
+      if (!isEdit) {
+        evictNewEditorCache('invoice');
+        navigate(`/dashboard/cobros/invoices/${invoiceId}`, { replace: true });
+      } else {
+        await invoiceQuery.refetch();
+      }
     },
   });
 
@@ -239,7 +244,7 @@ export default function InvoiceEditor() {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap no-print">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard/cobros?tab=invoices')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
+          <button onClick={() => { evictNewEditorCache('invoice'); navigate('/dashboard/cobros?tab=invoices'); }} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

@@ -6,7 +6,7 @@ export default function ProductModal({ modal, form, setF, categories, warehouses
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" /> 
       <div className="relative w-full max-w-2xl bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
         <div className="h-1 w-full bg-gradient-to-r from-indigo-500 to-violet-500" />
 

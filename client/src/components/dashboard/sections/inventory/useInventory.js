@@ -1,28 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
 import { EMPTY_PRODUCT, EMPTY_CATEGORY } from './constants';
+import { persistInventoryUi, readInventoryUi } from './modalStorage';
 
 export function useInventory() {
   const { user, company } = useCompany();
   const queryClient = useQueryClient();
+  const storedUi = readInventoryUi(company?.id);
 
   const [saving,     setSaving]     = useState(false);
   const [deleting,   setDeleting]   = useState(null);
   const [error,      setError]      = useState('');
 
   // Modales
-  const [productModal,  setProductModal]  = useState(null); // null | { mode, id? }
-  const [categoryModal, setCategoryModal] = useState(null);
-  const [stockModal,    setStockModal]    = useState(null); // { product }
+  const [productModal,  setProductModal]  = useState(storedUi?.productModal ?? null);
+  const [categoryModal, setCategoryModal] = useState(storedUi?.categoryModal ?? null);
+  const [stockModal,    setStockModal]    = useState(storedUi?.stockModal ?? null);
 
   // Formularios
-  const [productForm,  setProductForm]  = useState(EMPTY_PRODUCT);
-  const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY);
-  const [stockForm,    setStockForm]    = useState({ type: 'entrada', quantity: '', notes: '' });
+  const [productForm,  setProductForm]  = useState(storedUi?.productForm ?? EMPTY_PRODUCT);
+  const [categoryForm, setCategoryForm] = useState(storedUi?.categoryForm ?? EMPTY_CATEGORY);
+  const [stockForm,    setStockForm]    = useState(storedUi?.stockForm ?? { type: 'entrada', quantity: '', notes: '' });
+
+  useEffect(() => {
+    persistInventoryUi(company?.id, {
+      productModal,
+      productForm,
+      categoryModal,
+      categoryForm,
+      stockModal,
+      stockForm,
+    });
+  }, [company?.id, productModal, productForm, categoryModal, categoryForm, stockModal, stockForm]);
 
   // ── Carga ───────────────────────────────────────────────────
   const productsQuery = useQuery({
