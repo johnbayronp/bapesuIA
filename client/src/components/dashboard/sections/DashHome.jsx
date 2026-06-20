@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useQuery } from '@tanstack/react-query';
+import { db } from '../../../api/db';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
 
 const TOOLS = [
   {
@@ -47,7 +49,6 @@ const TOOLS = [
 
 export default function DashHome() {
   const { user, company } = useCompany();
-  const [stats, setStats] = useState({ clients: 0, members: 0, loading: true });
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
@@ -57,15 +58,25 @@ export default function DashHome() {
     else setGreeting('Buenas noches');
   }, []);
 
-  useEffect(() => {
-    if (!company?.id) return;
-    Promise.all([
-      supabase.from('bapesu_clients').select('id', { count: 'exact', head: true }).eq('company_id', company.id),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('company_id', company.id),
-    ]).then(([c, u]) => {
-      setStats({ clients: c.count ?? 0, members: u.count ?? 0, loading: false });
-    });
-  }, [company]);
+  const statsQuery = useQuery({
+    queryKey: queryKeys.company.dashboard(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: async () => {
+      const [clients, members] = await Promise.all([
+        db.from('bapesu_clients').select('id', { count: 'exact', head: true }).eq('company_id', company.id),
+        db.from('users').select('id', { count: 'exact', head: true }).eq('company_id', company.id),
+      ]);
+      if (clients.error) throw clients.error;
+      if (members.error) throw members.error;
+      return { clients: clients.count ?? 0, members: members.count ?? 0 };
+    },
+  });
+
+  const stats = {
+    clients: statsQuery.data?.clients ?? 0,
+    members: statsQuery.data?.members ?? 0,
+    loading: statsQuery.isLoading,
+  };
 
   const name = user?.email?.split('@')[0] ?? 'usuario';
 

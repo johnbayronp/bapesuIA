@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { clientsApi, invoicesApi, servicesApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { evictNewEditorCache } from '../routeCacheApi';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseCount, unwrapSupabaseResponse, unwrapSupabaseSingle } from '../../../lib/queryUtils';
 
 const formatCOP = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0,
@@ -48,27 +52,43 @@ export default function InvoiceEditor() {
   const { id } = useParams();
   const isEdit = Boolean(id);
 
-  const [loading, setLoading] = useState(isEdit);
-  const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState('');
 
   const [inv, setInv]       = useState(DEFAULT_INV);
   const [items, setItems]   = useState([newItem()]);
   const [clientId, setClientId] = useState(null);
 
-  const [clients, setClients]   = useState([]);
-  const [services, setServices] = useState([]);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!company?.id) return;
-    Promise.all([
-      supabase.from('bapesu_clients').select('id, name, nit, email, phone, city, address').eq('company_id', company.id).order('name'),
-      supabase.from('bapesu_services').select('id, name, default_price, unit, is_active').eq('company_id', company.id).eq('is_active', true).order('name'),
-    ]).then(([c, s]) => {
-      setClients(c.data ?? []);
-      setServices(s.data ?? []);
-    });
-  }, [company]);
+  const clientsQuery = useQuery({
+    queryKey: [...queryKeys.company.clients(company?.id), 'select'],
+    enabled: Boolean(company?.id),
+    queryFn: () => clientsApi.listForSelect(company.id, 'id, name, nit, email, phone, city, address').then(unwrapSupabaseResponse),
+  });
+  const servicesQuery = useQuery({
+    queryKey: [...queryKeys.company.services(company?.id), 'active-select'],
+    enabled: Boolean(company?.id),
+    queryFn: () => servicesApi.listActiveForSelect(company.id, 'id, name, default_price, unit, is_active').then(unwrapSupabaseResponse),
+  });
+  const nextNumberQuery = useQuery({
+    queryKey: [...queryKeys.company.invoices(company?.id), 'next-number'],
+    enabled: Boolean(company?.id) && !isEdit,
+    queryFn: () => invoicesApi.countByCompany(company.id).then(unwrapSupabaseCount),
+  });
+  const invoiceQuery = useQuery({
+    queryKey: queryKeys.company.invoice(id),
+    enabled: Boolean(company?.id) && isEdit,
+    queryFn: async () => {
+      const [invoice, invoiceItems] = await Promise.all([
+        invoicesApi.get(id).then(unwrapSupabaseSingle),
+        invoicesApi.getItems(id).then(unwrapSupabaseResponse),
+      ]);
+      return { invoice, invoiceItems };
+    },
+  });
+
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+  const services = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
 
   // Pre-cargar payment_info de la empresa
   useEffect(() => {
@@ -78,16 +98,13 @@ export default function InvoiceEditor() {
 
   // Número auto
   useEffect(() => {
-    if (isEdit || !company?.id) return;
-    supabase
-      .from('bapesu_invoices').select('id', { count: 'exact', head: true }).eq('company_id', company.id)
-      .then(({ count }) => setInv((p) => ({ ...p, number: String((count ?? 0) + 1).padStart(3, '0') })));
-  }, [isEdit, company]);
+    if (isEdit || nextNumberQuery.data == null) return;
+    setInv((p) => ({ ...p, number: String((nextNumberQuery.data ?? 0) + 1).padStart(3, '0') }));
+  }, [isEdit, nextNumberQuery.data]);
 
-  const loadInv = useCallback(async () => {
-    if (!isEdit || !company?.id) return;
-    setLoading(true);
-    const { data: q } = await supabase.from('bapesu_invoices').select('*').eq('id', id).maybeSingle();
+  useEffect(() => {
+    if (!isEdit) return;
+    const q = invoiceQuery.data?.invoice;
     if (q) {
       setInv({
         number: q.number ?? '', issue_date: q.issue_date ?? DEFAULT_INV.issue_date,
@@ -98,15 +115,12 @@ export default function InvoiceEditor() {
       });
       setClientId(q.client_id ?? null);
 
-      const { data: its } = await supabase.from('bapesu_invoice_items').select('*').eq('invoice_id', id).order('position');
+      const its = invoiceQuery.data?.invoiceItems ?? [];
       setItems(its && its.length ? its.map((i) => ({
         service_id: i.service_id, description: i.description, quantity: Number(i.quantity), price: Number(i.price), position: i.position,
       })) : [newItem()]);
     }
-    setLoading(false);
-  }, [isEdit, id, company]);
-
-  useEffect(() => { loadInv(); }, [loadInv]);
+  }, [invoiceQuery.data, isEdit]);
 
   const setI = (k, v) => setInv((p) => ({ ...p, [k]: v }));
   const updateItem = (i, k, v) => setItems((p) => p.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
@@ -128,11 +142,8 @@ export default function InvoiceEditor() {
   const retAmt   = inv.include_retefuente ? subtotal * (Number(inv.retefuente_rate) || 0) / 100 : 0;
   const total    = subtotal + ivaAmt - retAmt;
 
-  const handleSave = async (status = inv.status) => {
-    if (!company?.id) { setError('No tienes empresa asociada'); return; }
-    setSaving(true); setError('');
-
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async (status = inv.status) => {
       const payload = {
         company_id: company.id,
         client_id: clientId,
@@ -158,16 +169,16 @@ export default function InvoiceEditor() {
 
       let invoiceId = id;
       if (isEdit) {
-        const { error: e } = await supabase.from('bapesu_invoices').update(payload).eq('id', id);
+        const { error: e } = await invoicesApi.update(id, payload);
         if (e) throw e;
       } else {
-        const { data, error: e } = await supabase
-          .from('bapesu_invoices').insert({ ...payload, created_by: user?.id ?? null }).select('id').single();
+        const { data, error: e } = await invoicesApi.create({ ...payload, created_by: user?.id ?? null });
         if (e) throw e;
         invoiceId = data.id;
       }
 
-      await supabase.from('bapesu_invoice_items').delete().eq('invoice_id', invoiceId);
+      const removeRes = await invoicesApi.removeItems(invoiceId);
+      if (removeRes.error) throw removeRes.error;
       const itemsPayload = items
         .filter((i) => i.description.trim() || i.price > 0)
         .map((i, idx) => ({
@@ -179,22 +190,42 @@ export default function InvoiceEditor() {
           position: idx,
         }));
       if (itemsPayload.length) {
-        const { error: e } = await supabase.from('bapesu_invoice_items').insert(itemsPayload);
+        const { error: e } = await invoicesApi.addItems(itemsPayload);
         if (e) throw e;
       }
 
-      if (!isEdit) navigate(`/dashboard/cobros/invoices/${invoiceId}`, { replace: true });
-      else await loadInv();
+      return invoiceId;
+    },
+    onSuccess: async (invoiceId) => {
+      await invalidateCompanyData(queryClient, company?.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.company.invoice(invoiceId) });
+      if (!isEdit) {
+        evictNewEditorCache('invoice');
+        navigate(`/dashboard/cobros/invoices/${invoiceId}`, { replace: true });
+      } else {
+        await invoiceQuery.refetch();
+      }
+    },
+  });
+
+  const handleSave = async (status = inv.status) => {
+    if (!company?.id) { setError('No tienes empresa asociada'); return; }
+    setError('');
+
+    try {
+      await saveMutation.mutateAsync(status);
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
     }
-    setSaving(false);
   };
 
   const handlePrint = async () => {
     if (!isEdit) await handleSave();
     window.print();
   };
+
+  const loading = (isEdit && invoiceQuery.isLoading) || clientsQuery.isLoading || servicesQuery.isLoading;
+  const saving = saveMutation.isPending;
 
   if (loading) {
     return (
@@ -213,7 +244,7 @@ export default function InvoiceEditor() {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap no-print">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard/cobros?tab=invoices')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
+          <button onClick={() => { evictNewEditorCache('invoice'); navigate('/dashboard/cobros?tab=invoices'); }} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useState, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { superadminApi } from '../../api';
+import { queryKeys } from '../../lib/queryKeys';
 
 const ROLES = ['user', 'admin', 'superadmin'];
 const ROLE_COLORS = {
@@ -9,25 +11,30 @@ const ROLE_COLORS = {
 };
 
 export default function SAUsers() {
-  const [users,      setUsers]      = useState([]);
-  const [companies,  setCompanies]  = useState({});
-  const [loading,    setLoading]    = useState(true);
+  const queryClient = useQueryClient();
   const [search,     setSearch]     = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [{ data: us }, { data: cos }] = await Promise.all([
-      supabase.from('users').select('*').order('created_at', { ascending: true }),
-      supabase.from('bapesu_companies').select('id,name,plan'),
-    ]);
-    const allUsers = us ?? [];
-    setUsers(allUsers);
+  const usersQuery = useQuery({
+    queryKey: queryKeys.superadmin.users,
+    queryFn: () => superadminApi.listUsers(),
+  });
+
+  const users = usersQuery.data?.users ?? [];
+  const companies = useMemo(() => {
     const map = {};
-    (cos ?? []).forEach((c) => { map[c.id] = c; });
-    setCompanies(map);
-    setLoading(false);
-  }, []);
+    (usersQuery.data?.companies ?? []).forEach((c) => { map[c.id] = c; });
+    return map;
+  }, [usersQuery.data?.companies]);
+  const loading = usersQuery.isLoading;
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, payload }) => {
+      const response = await superadminApi.updateUser(id, payload);
+      if (response.error) throw response.error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.superadmin.users }),
+  });
 
   // El dueño de cada empresa = primer admin creado por company_id
   const ownerIds = useMemo(() => {
@@ -44,16 +51,12 @@ export default function SAUsers() {
     return ids;
   }, [users]);
 
-  useEffect(() => { load(); }, [load]);
-
   const handleRoleChange = async (uid, role) => {
-    await supabase.from('users').update({ role, updated_at: new Date().toISOString() }).eq('id', uid);
-    load();
+    await updateUserMutation.mutateAsync({ id: uid, payload: { role, updated_at: new Date().toISOString() } });
   };
 
   const handleToggle = async (u) => {
-    await supabase.from('users').update({ is_active: !u.is_active }).eq('id', u.id);
-    load();
+    await updateUserMutation.mutateAsync({ id: u.id, payload: { is_active: !u.is_active } });
   };
 
   const filtered = useMemo(() => {

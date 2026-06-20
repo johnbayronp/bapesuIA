@@ -1,6 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { db } from '../../../api/db';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
 
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
@@ -31,14 +33,14 @@ function StatCard({ label, value, sub, icon, color = 'yellow', info }) {
     gray:    'from-gray-300 to-gray-400',
   };
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex items-start gap-4 relative">
-      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${colors[color]} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+    <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm flex items-start gap-3 sm:gap-4 relative min-w-0">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br ${colors[color]} flex items-center justify-center flex-shrink-0 shadow-sm`}>
         <span className="text-white">{icon}</span>
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs text-gray-500 font-medium">{label}</p>
-        <p className="text-2xl font-extrabold text-gray-900 mt-0.5 truncate">{value}</p>
-        {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+        <p className="text-xl sm:text-2xl font-extrabold text-gray-900 mt-0.5 leading-tight break-words">{value}</p>
+        {sub && <p className="text-[11px] text-gray-400 mt-1 leading-snug break-words">{sub}</p>}
       </div>
       {info && (
         <div className="relative flex-shrink-0">
@@ -54,7 +56,7 @@ function StatCard({ label, value, sub, icon, color = 'yellow', info }) {
             </svg>
           </button>
           {showInfo && (
-            <div className="absolute right-0 top-7 z-50 w-56 bg-gray-900 text-white text-[11px] leading-relaxed rounded-xl px-3 py-2.5 shadow-xl pointer-events-none">
+            <div className="absolute right-0 top-7 z-50 w-52 sm:w-56 max-w-[calc(100vw-2rem)] bg-gray-900 text-white text-[11px] leading-relaxed rounded-xl px-3 py-2.5 shadow-xl pointer-events-none">
               {info}
               <div className="absolute -top-1.5 right-2 w-3 h-3 bg-gray-900 rotate-45 rounded-sm" />
             </div>
@@ -108,43 +110,48 @@ function MiniBar({ data, maxVal, color = '#f59e0b' }) {
 
 export default function Analytics() {
   const { company } = useCompany();
-  const [loading,    setLoading]    = useState(true);
-  const [invoices,   setInvoices]   = useState([]);
-  const [facturas,   setFacturas]   = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [clients,    setClients]    = useState([]);
-  const [services,   setServices]   = useState([]);
-  const [products,   setProducts]   = useState([]);
-  const [movements,  setMovements]  = useState([]);
-
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
+  const analyticsQuery = useQuery({
+    queryKey: queryKeys.company.analytics(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: async () => {
     const thisMonthStart = new Date().toISOString().slice(0, 7) + '-01';
     const [inv, fac, quo, cli, svc, prod, mov] = await Promise.all([
-      supabase.from('bapesu_invoices').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
-      supabase.from('bapesu_facturas').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
-      supabase.from('bapesu_quotations').select('id,total,status,issue_date,client_name').eq('company_id', company.id),
-      supabase.from('bapesu_clients').select('id,name,created_at').eq('company_id', company.id),
-      supabase.from('bapesu_services').select('id,name,default_price,is_active').eq('company_id', company.id),
-      supabase.from('bapesu_products').select('id,name,stock_available,stock_min,purchase_price,sale_price,is_active').eq('company_id', company.id),
-      supabase.from('bapesu_stock_movements')
+      db.from('bapesu_invoices').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
+      db.from('bapesu_facturas').select('id,total,status,issue_date,due_date,updated_at,client_name').eq('company_id', company.id),
+      db.from('bapesu_quotations').select('id,total,status,issue_date,client_name').eq('company_id', company.id),
+      db.from('bapesu_clients').select('id,name,created_at').eq('company_id', company.id),
+      db.from('bapesu_services').select('id,name,default_price,is_active').eq('company_id', company.id),
+      db.from('bapesu_products').select('id,name,stock_available,stock_min,purchase_price,sale_price,is_active').eq('company_id', company.id),
+      db.from('bapesu_stock_movements')
         .select('quantity,type,bapesu_products!product_id(purchase_price)')
         .eq('company_id', company.id)
         .eq('type', 'salida')
         .gte('created_at', thisMonthStart),
     ]);
-    setInvoices(inv.data   ?? []);
-    setFacturas(fac.data   ?? []);
-    setQuotations(quo.data ?? []);
-    setClients(cli.data    ?? []);
-    setServices(svc.data   ?? []);
-    setProducts(prod.data  ?? []);
-    setMovements(mov.data  ?? []);
-    setLoading(false);
-  }, [company]);
+      const error = [inv, fac, quo, cli, svc, prod, mov].find((res) => res.error)?.error;
+      if (error) throw error;
+      return {
+        invoices: inv.data ?? [],
+        facturas: fac.data ?? [],
+        quotations: quo.data ?? [],
+        clients: cli.data ?? [],
+        services: svc.data ?? [],
+        products: prod.data ?? [],
+        movements: mov.data ?? [],
+      };
+    },
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const {
+    invoices = [],
+    facturas = [],
+    quotations = [],
+    clients = [],
+    services = [],
+    products = [],
+    movements = [],
+  } = analyticsQuery.data ?? {};
+  const loading = analyticsQuery.isLoading;
 
   // ── Métricas ──────────────────────────────────────────────────
   const today      = new Date().toISOString().slice(0, 10);
@@ -241,7 +248,6 @@ export default function Analytics() {
     const slot = last6.find((s) => s.month === d.getMonth() && s.year === d.getFullYear());
     if (slot) slot.value += Number(inv.total);
   });
-  const maxRevenue = Math.max(...last6.map((s) => s.value), 1);
 
   // ── Cotizaciones por mes (últimos 6) ─────────────────────────
   const last6q = Array.from({ length: 6 }, (_, i) => {
@@ -292,18 +298,18 @@ export default function Analytics() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 px-1 sm:px-0">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-xl font-extrabold text-gray-900">Analíticas</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Resumen de actividad de {company?.name}</p>
+          <p className="text-sm text-gray-500 mt-0.5 break-words">Resumen de actividad de {company?.name}</p>
         </div>
         <button
-          onClick={load}
+          onClick={() => analyticsQuery.refetch()}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition disabled:opacity-50"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 active:scale-95 transition disabled:opacity-50"
         >
           <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -313,7 +319,7 @@ export default function Analytics() {
       </div>
 
       {/* KPIs — fila 1: cobros */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label="Ingresos cobrados" value={formatCOP(totalRevenue)}
           sub={`${paidDocs.length} documento${paidDocs.length !== 1 ? 's' : ''} pagado${paidDocs.length !== 1 ? 's' : ''}`}
           color="emerald"
@@ -341,7 +347,7 @@ export default function Analytics() {
       </div>
 
       {/* KPIs — fila 2: operaciones rápidas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label="Ticket promedio" value={paidDocs.length > 0 ? formatCOP(ticketAvg) : '—'}
           sub={ticketSub} color="indigo"
           info="Valor promedio de cada cobro pagado. Útil para entender el tamaño típico de tus trabajos. Se vuelve representativo a partir de 3 pagos."
@@ -371,7 +377,7 @@ export default function Analytics() {
 
       {/* Inventario — solo si tiene valor */}
       {hasInventory && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard label="Productos activos" value={activeProducts.length} sub={`${products.length} en total`} color="indigo"
             info="Cantidad de productos marcados como activos en tu inventario. Los inactivos no aparecen en operaciones ni cotizaciones."
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>}
@@ -394,24 +400,24 @@ export default function Analytics() {
       )}
 
       {/* Bloque: Ganancia estimada del mes + Próximas por vencer */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
 
         {/* Ganancia estimada */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
           <h2 className="text-sm font-bold text-gray-800 mb-1">Resumen del mes</h2>
           <p className="text-xs text-gray-400 mb-4">{new Date().toLocaleString('es-CO', { month: 'long', year: 'numeric' })}</p>
           <div className="space-y-3">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <div className="flex flex-col min-[420px]:flex-row min-[420px]:justify-between min-[420px]:items-center gap-1 py-2 border-b border-gray-100">
               <span className="text-xs text-gray-600">💰 Ingresos cobrados</span>
-              <span className="text-sm font-bold text-emerald-600">{formatCOP(revenueThisMonth)}</span>
+              <span className="text-sm font-bold text-emerald-600 break-words">{formatCOP(revenueThisMonth)}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <div className="flex flex-col min-[420px]:flex-row min-[420px]:justify-between min-[420px]:items-center gap-1 py-2 border-b border-gray-100">
               <span className="text-xs text-gray-600">📦 Costo de insumos (salidas)</span>
-              <span className="text-sm font-bold text-red-500">− {formatCOP(costThisMonth)}</span>
+              <span className="text-sm font-bold text-red-500 break-words">− {formatCOP(costThisMonth)}</span>
             </div>
-            <div className="flex justify-between items-center py-2 bg-gray-50 rounded-xl px-3">
+            <div className="flex flex-col min-[420px]:flex-row min-[420px]:justify-between min-[420px]:items-center gap-1 py-2 bg-gray-50 rounded-xl px-3">
               <span className="text-xs font-semibold text-gray-700">✨ Ganancia estimada</span>
-              <span className={`text-base font-extrabold ${profitThisMonth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <span className={`text-base font-extrabold break-words ${profitThisMonth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatCOP(profitThisMonth)}
               </span>
             </div>
@@ -422,7 +428,7 @@ export default function Analytics() {
         </div>
 
         {/* Próximas por vencer */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
           <h2 className="text-sm font-bold text-gray-800 mb-1">Próximas por vencer</h2>
           <p className="text-xs text-gray-400 mb-4">Cuentas enviadas que vencen en los próximos 7 días</p>
           {soonDue.length === 0 ? (
@@ -435,13 +441,13 @@ export default function Analytics() {
               {soonDue.map((doc) => {
                 const daysLeft = Math.ceil((new Date(doc.due_date + 'T12:00:00') - new Date(today + 'T12:00:00')) / 86400000);
                 return (
-                  <div key={doc.id} className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border ${daysLeft <= 2 ? 'border-red-100 bg-red-50/40' : 'border-amber-100 bg-amber-50/30'}`}>
+                  <div key={doc.id} className={`flex flex-col min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between gap-2 p-2.5 rounded-xl border ${daysLeft <= 2 ? 'border-red-100 bg-red-50/40' : 'border-amber-100 bg-amber-50/30'}`}>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-gray-800 truncate">{doc.client_name ?? '—'}</p>
                       <p className="text-[10px] text-gray-400">{new Date(doc.due_date + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}</p>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs font-bold text-gray-900">{formatCOP(doc.total)}</p>
+                    <div className="min-[420px]:text-right flex-shrink-0">
+                      <p className="text-xs font-bold text-gray-900 break-words">{formatCOP(doc.total)}</p>
                       <span className={`text-[10px] font-bold ${daysLeft <= 2 ? 'text-red-600' : 'text-amber-600'}`}>
                         {daysLeft === 0 ? 'Vence hoy' : `${daysLeft}d restantes`}
                       </span>
@@ -455,10 +461,10 @@ export default function Analytics() {
       </div>
 
       {/* Gráficas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
 
         {/* Gráfica cartera apilada */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0 overflow-hidden">
           <h2 className="text-sm font-bold text-gray-800 mb-1">Cartera por mes</h2>
           <p className="text-xs text-gray-400 mb-3">Pagado · Por cobrar · Vencido</p>
           <div className="flex items-end gap-1.5" style={{ height: BAR_H }}>
@@ -489,7 +495,7 @@ export default function Analytics() {
               </div>
             ))}
           </div>
-          <div className="flex gap-3 mt-3">
+          <div className="flex flex-wrap gap-x-3 gap-y-2 mt-3">
             {[['#10b981','Pagado'],['#f59e0b','Por cobrar'],['#ef4444','Vencido']].map(([c,l]) => (
               <div key={l} className="flex items-center gap-1">
                 <div className="w-2.5 h-2.5 rounded-sm" style={{ background: c }} />
@@ -500,7 +506,7 @@ export default function Analytics() {
         </div>
 
         {/* Cotizaciones por mes */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0 overflow-hidden">
           <h2 className="text-sm font-bold text-gray-800 mb-1">Cotizaciones — últimos 6 meses</h2>
           <p className="text-xs text-gray-400 mb-4">Total generadas por mes</p>
           <MiniBar data={last6q} maxVal={maxQuotes} color="#f59e0b" />
@@ -508,21 +514,21 @@ export default function Analytics() {
       </div>
 
       {/* Estados + Top clientes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
         {/* Estado cuentas de cobro */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
           <h2 className="text-sm font-bold text-gray-800 mb-4">Estado cuentas de cobro</h2>
           {invByStatus.length === 0 ? (
             <p className="text-xs text-gray-400">Sin datos aún</p>
           ) : (
             <div className="space-y-2.5">
               {invByStatus.map((s) => (
-                <div key={s.key} className="flex items-center justify-between gap-2">
+                <div key={s.key} className="flex items-center justify-between gap-2 min-w-0">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${s.color}`}>{s.label}</span>
                   <div className="text-right">
                     <p className="text-xs font-bold text-gray-900">{s.count}</p>
-                    <p className="text-[10px] text-gray-400">{formatCOP(s.total)}</p>
+                    <p className="text-[10px] text-gray-400 break-words">{formatCOP(s.total)}</p>
                   </div>
                 </div>
               ))}
@@ -531,7 +537,7 @@ export default function Analytics() {
         </div>
 
         {/* Estado cotizaciones */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
           <h2 className="text-sm font-bold text-gray-800 mb-4">Estado cotizaciones</h2>
           {quoByStatus.length === 0 ? (
             <p className="text-xs text-gray-400">Sin datos aún</p>
@@ -548,7 +554,7 @@ export default function Analytics() {
         </div>
 
         {/* Top clientes */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
           <h2 className="text-sm font-bold text-gray-800 mb-4">Top clientes por ingreso</h2>
           {topClients.length === 0 ? (
             <p className="text-xs text-gray-400">Sin cuentas pagadas aún</p>
@@ -556,11 +562,11 @@ export default function Analytics() {
             <div className="space-y-3">
               {topClients.map(([name, total], i) => (
                 <div key={name}>
-                  <div className="flex justify-between items-center mb-1">
+                  <div className="flex justify-between items-center gap-2 mb-1">
                     <p className="text-xs font-medium text-gray-700 truncate max-w-[60%]">
                       <span className="text-gray-400 mr-1">#{i + 1}</span>{name}
                     </p>
-                    <p className="text-xs font-bold text-emerald-600">{formatCOP(total)}</p>
+                    <p className="text-xs font-bold text-emerald-600 text-right break-words">{formatCOP(total)}</p>
                   </div>
                   <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"

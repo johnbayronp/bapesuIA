@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { useQuery } from '@tanstack/react-query';
+import { superadminApi } from '../../api';
 import { useCompany } from '../../context/CompanyContext';
+import { queryKeys } from '../../lib/queryKeys';
 import SACompanies from './SACompanies';
 import SAPlans from './SAPlans';
 import SAUsers from './SAUsers';
@@ -26,24 +28,19 @@ const NAV = [
 ];
 
 function SAOverview() {
-  const [stats, setStats] = useState({ companies: 0, users: 0, byPlan: {} });
-  const [loading, setLoading] = useState(true);
+  const overviewQuery = useQuery({
+    queryKey: queryKeys.superadmin.dashboard,
+    queryFn: superadminApi.dashboard,
+  });
 
-  useEffect(() => {
-    const load = async () => {
-      const [{ data: companies }, { data: users }] = await Promise.all([
-        supabase.from('bapesu_companies').select('id,plan,is_active,created_at'),
-        supabase.from('users').select('id,role,created_at'),
-      ]);
-      const byPlan = (companies ?? []).reduce((acc, c) => {
-        acc[c.plan ?? 'free'] = (acc[c.plan ?? 'free'] || 0) + 1;
-        return acc;
-      }, {});
-      setStats({ companies: (companies ?? []).length, users: (users ?? []).length, byPlan });
-      setLoading(false);
-    };
-    load();
-  }, []);
+  const companies = overviewQuery.data?.companies ?? [];
+  const users = overviewQuery.data?.users ?? [];
+  const byPlan = companies.reduce((acc, c) => {
+    acc[c.plan ?? 'free'] = (acc[c.plan ?? 'free'] || 0) + 1;
+    return acc;
+  }, {});
+  const stats = { companies: companies.length, users: users.length, byPlan };
+  const loading = overviewQuery.isLoading;
 
   const formatCOP = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
 
@@ -103,7 +100,7 @@ function SAOverview() {
 export default function SuperAdminDashboard() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, isSuperAdmin, loading } = useCompany();
+  const { user, isSuperAdmin, loading } = useCompany();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {

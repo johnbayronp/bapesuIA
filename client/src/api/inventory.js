@@ -19,7 +19,7 @@ export const inventoryApi = {
 
   getProductStock: (id) =>
     db.from('bapesu_products')
-      .select('id, stock_available, purchase_price, sale_price')
+      .select('id, name, stock_available, purchase_price, sale_price')
       .eq('id', id)
       .single(),
 

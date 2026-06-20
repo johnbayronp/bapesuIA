@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { db } from '../api/db';
 
 // Servicio de debug para diagnosticar problemas (usando UUID directamente)
 export const userServiceDebug = {
@@ -11,7 +11,7 @@ export const userServiceDebug = {
       console.log('🔍 [DEBUG] UUID del usuario:', userId);
       
       // Intentar obtener perfil directamente
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('*')
         .eq('id', userId)
@@ -35,7 +35,7 @@ export const userServiceDebug = {
     try {
       console.log('🔍 [DEBUG] Obteniendo todos los usuarios...');
       
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('*')
         .limit(10);
@@ -60,7 +60,7 @@ export const userServiceDebug = {
       
       console.log('🔍 [DEBUG] UUID del usuario:', userId);
       
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('id')
         .eq('id', userId)
@@ -87,7 +87,7 @@ export const userServiceDebug = {
       
       console.log('🔍 [DEBUG] UUID del usuario:', userData.id);
       
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .insert([
           {

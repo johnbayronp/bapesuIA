@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
 import { useCompany } from '../../../context/CompanyContext';
-
-const FACTURA_PREFIX = 'FAC';
+import { useConvertInvoiceToFactura, useDeleteInvoice, useDuplicateInvoice, useInvoices } from '../../../hooks/useInvoices';
 
 const formatCOP = (n) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', minimumFractionDigits: 0,
@@ -19,105 +17,35 @@ const STATUS = {
 export default function InvoicesList() {
   const { company } = useCompany();
   const navigate = useNavigate();
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [deleting, setDeleting] = useState(null);
-
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('bapesu_invoices').select('*').eq('company_id', company.id)
-      .order('created_at', { ascending: false });
-    setList(data ?? []);
-    setLoading(false);
-  }, [company]);
-
-  useEffect(() => { load(); }, [load]);
+  const {
+    data: list = [],
+    isLoading,
+    isFetching,
+    isError,
+    error,
+  } = useInvoices(company?.id);
+  const deleteInvoice = useDeleteInvoice(company?.id);
+  const duplicateInvoice = useDuplicateInvoice(company?.id);
+  const convertInvoice = useConvertInvoiceToFactura(company?.id);
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm('¿Eliminar esta cuenta de cobro?')) return;
-    setDeleting(id);
-    await supabase.from('bapesu_invoices').delete().eq('id', id);
-    await load();
-    setDeleting(null);
+    try {
+      await deleteInvoice.mutateAsync(id);
+    } catch (mutationError) {
+      window.alert(mutationError?.message || 'No se pudo eliminar la cuenta de cobro.');
+    }
   };
 
   const handleConvertToFactura = async (inv, e) => {
     e.stopPropagation();
-    if (!window.confirm(`¿Convertir la cuenta de cobro #${inv.number} a factura?\nSe creará una nueva factura pre-llenada con los mismos datos.`)) return;
+    if (!window.confirm(`�Convertir la cuenta de cobro #${inv.number} a factura?`)) return;
 
     try {
-      // Obtener ítems de la cuenta de cobro
-      const { data: items } = await supabase
-        .from('bapesu_invoice_items')
-        .select('*')
-        .eq('invoice_id', inv.id)
-        .order('position');
-
-      // Calcular número de la nueva factura
-      const { count } = await supabase
-        .from('bapesu_facturas')
-        .select('id', { count: 'exact', head: true })
-        .eq('company_id', company.id);
-      const newNumber = String((count ?? 0) + 1).padStart(3, '0');
-
-      // Crear la factura con los datos de la cuenta de cobro
-      const { data: newFac, error } = await supabase
-        .from('bapesu_facturas')
-        .insert({
-          company_id:         company.id,
-          client_id:          inv.client_id,
-          client_name:        inv.client_name,
-          client_nit:         inv.client_nit,
-          client_email:       inv.client_email,
-          client_phone:       inv.client_phone,
-          client_address:     inv.client_address,
-          prefix:             FACTURA_PREFIX,
-          number:             newNumber,
-          issue_date:         inv.issue_date,
-          due_date:           inv.due_date,
-          concept:            inv.concept,
-          notes:              inv.notes,
-          payment_info:       inv.payment_info,
-          include_iva:        inv.include_iva,
-          iva_rate:           inv.iva_rate,
-          include_retefuente: inv.include_retefuente,
-          retefuente_rate:    inv.retefuente_rate,
-          include_reteiva:    false,
-          reteiva_rate:       15,
-          include_reteica:    false,
-          reteica_rate:       0.414,
-          subtotal:           inv.subtotal,
-          iva_amount:         inv.iva_amount,
-          retefuente_amount:  inv.retefuente_amount,
-          reteiva_amount:     0,
-          reteica_amount:     0,
-          total:              inv.total,
-          status:             'draft',
-        })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-
-      // Copiar ítems
-      if (items?.length) {
-        await supabase.from('bapesu_factura_items').insert(
-          items.map((it) => ({
-            factura_id:  newFac.id,
-            service_id:  it.service_id,
-            description: it.description,
-            quantity:    it.quantity,
-            price:       it.price,
-            position:    it.position,
-          }))
-        );
-      }
-
+      const newFac = await convertInvoice.mutateAsync(inv);
       navigate(`/dashboard/facturacion/${newFac.id}`);
     } catch (err) {
       alert('Error al convertir: ' + (err.message ?? 'intenta de nuevo'));
@@ -126,23 +54,12 @@ export default function InvoicesList() {
 
   const handleDuplicate = async (q, e) => {
     e.stopPropagation();
-    const { data: items } = await supabase.from('bapesu_invoice_items').select('*').eq('invoice_id', q.id);
-    const { data: newQ, error } = await supabase
-      .from('bapesu_invoices')
-      .insert({
-        ...q, id: undefined,
-        number: q.number ? `${q.number}-COPY` : null,
-        status: 'draft',
-        created_at: undefined, updated_at: undefined,
-      })
-      .select('id').single();
-    if (error || !newQ) return;
-    if (items?.length) {
-      await supabase.from('bapesu_invoice_items').insert(
-        items.map((i) => ({ ...i, id: undefined, invoice_id: newQ.id, created_at: undefined }))
-      );
+    try {
+      const newQ = await duplicateInvoice.mutateAsync(q);
+      navigate(`/dashboard/invoices/${newQ.id}`);
+    } catch (mutationError) {
+      window.alert(mutationError?.message || 'No se pudo duplicar la cuenta de cobro.');
     }
-    navigate(`/dashboard/invoices/${newQ.id}`);
   };
 
   const filtered = list
@@ -164,7 +81,9 @@ export default function InvoicesList() {
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-extrabold text-gray-900">Cuentas de cobro</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{list.length} en total</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {list.length} en total{isFetching && !isLoading ? ' - actualizando' : ''}
+          </p>
         </div>
         <Link
           to="/dashboard/invoices/new"
@@ -213,12 +132,17 @@ export default function InvoicesList() {
       </div>
 
       {/* Lista */}
-      {loading ? (
+      {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <svg className="w-6 h-6 animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 bg-white border border-red-100 rounded-2xl text-center">
+          <p className="text-gray-700 font-semibold">No se pudieron cargar las cuentas de cobro</p>
+          <p className="text-sm text-gray-400 mt-1">{error?.message || 'Intenta de nuevo en unos segundos.'}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 bg-white border border-dashed border-gray-200 rounded-2xl text-center">
@@ -288,7 +212,7 @@ export default function InvoicesList() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </button>
-                    <button onClick={(e) => handleDelete(q.id, e)} disabled={deleting === q.id} title="Eliminar" className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-40">
+                    <button onClick={(e) => handleDelete(q.id, e)} disabled={deleteInvoice.variables === q.id && deleteInvoice.isPending} title="Eliminar" className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-40">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>

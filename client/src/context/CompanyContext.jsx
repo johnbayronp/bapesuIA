@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { db } from '../api/db';
 
 // ── Módulos por plan ──────────────────────────────────────────────────
 export const PLAN_MODULES = {
@@ -30,9 +31,10 @@ export function CompanyProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
+  const hasLoadedOnce = useRef(false);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async ({ silent = false } = {}) => {
+    if (!silent && !hasLoadedOnce.current) setLoading(true);
     try {
       const { data: { user: u } } = await supabase.auth.getUser();
       setUser(u ?? null);
@@ -44,7 +46,7 @@ export function CompanyProvider({ children }) {
       }
 
       // Cargar perfil del usuario (con company_id)
-      const { data: p } = await supabase
+      const { data: p } = await db
         .from('users')
         .select('id, email, role, company_id, first_name, last_name, is_active')
         .eq('id', u.id)
@@ -54,7 +56,7 @@ export function CompanyProvider({ children }) {
 
       // Cargar la empresa del usuario
       if (p?.company_id) {
-        const { data: c } = await supabase
+        const { data: c } = await db
           .from('bapesu_companies')
           .select('*')
           .eq('id', p.company_id)
@@ -67,13 +69,20 @@ export function CompanyProvider({ children }) {
       console.error('CompanyContext load error:', err);
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, []);
 
   useEffect(() => {
     loadAll();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadAll();
+    const silentEvents = new Set(['TOKEN_REFRESHED', 'INITIAL_SESSION']);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        hasLoadedOnce.current = false;
+        loadAll();
+        return;
+      }
+      loadAll({ silent: silentEvents.has(event) || hasLoadedOnce.current });
     });
     return () => subscription.unsubscribe();
   }, [loadAll]);
@@ -81,11 +90,11 @@ export function CompanyProvider({ children }) {
   // Asigna el company_id al perfil del usuario y recarga
   const setCompanyId = async (companyId) => {
     if (!user) return;
-    await supabase
+    await db
       .from('users')
       .update({ company_id: companyId, updated_at: new Date().toISOString() })
       .eq('id', user.id);
-    await loadAll();
+    await loadAll({ silent: true });
   };
 
   const isSuperAdmin = profile?.role === 'superadmin';

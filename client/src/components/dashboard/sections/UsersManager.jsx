@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase, supabaseAuxAuth } from '../../../lib/supabase';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabaseAuxAuth } from '../../../lib/supabase';
+import { adminApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/queryUtils';
 
 const EMPTY = { email: '', password: '', confirmPassword: '', role: 'user' };
 
@@ -20,8 +24,7 @@ const generatePassword = () => {
 
 export default function UsersManager() {
   const { company, profile } = useCompany();
-  const [users, setUsers]     = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch]   = useState('');
   const [modal, setModal]     = useState(false);
   const [saving, setSaving]   = useState(false);
@@ -32,19 +35,31 @@ export default function UsersManager() {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('users')
-      .select('id, email, role, created_at, is_active, first_name, last_name, company_id')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false });
-    setUsers(data ?? []);
-    setLoading(false);
-  }, [company]);
+  const usersQuery = useQuery({
+    queryKey: queryKeys.company.users(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => adminApi.listCompanyUsers(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const users = usersQuery.data ?? [];
+  const loading = usersQuery.isLoading;
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, payload }) => {
+      const response = await adminApi.updateUser(id, payload);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const assignUserMutation = useMutation({
+    mutationFn: async ({ userId, companyId, role }) => {
+      const response = await adminApi.assignUserToCompany(userId, companyId, role);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
 
   const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -90,15 +105,9 @@ export default function UsersManager() {
       await supabaseAuxAuth.auth.signOut();
 
       // Asignar empresa y rol usando función SECURITY DEFINER (evita bloqueo RLS)
-      const { error: rpcErr } = await supabase.rpc('admin_assign_user_to_company', {
-        p_user_id:    data.user.id,
-        p_company_id: company.id,
-        p_role:       form.role,
-      });
-      if (rpcErr) throw rpcErr;
+      await assignUserMutation.mutateAsync({ userId: data.user.id, companyId: company.id, role: form.role });
 
       setCreatedInfo({ email: form.email, password: form.password });
-      await load();
     } catch (e) {
       setError(e.message ?? 'No se pudo crear el usuario');
     }
@@ -108,22 +117,20 @@ export default function UsersManager() {
   const handleToggleRole = async (u) => {
     const newRole = u.role === 'admin' ? 'user' : 'admin';
     if (!window.confirm(`¿Cambiar rol de ${u.email} a "${newRole}"?`)) return;
-    await supabase.from('users').update({ role: newRole, updated_at: new Date().toISOString() }).eq('id', u.id);
-    await load();
+    await updateUserMutation.mutateAsync({ id: u.id, payload: { role: newRole, updated_at: new Date().toISOString() } });
   };
 
   const handleToggleActive = async (u) => {
     const next = !u.is_active;
     if (!window.confirm(`¿${next ? 'Activar' : 'Desactivar'} a ${u.email}?`)) return;
-    await supabase.from('users').update({ is_active: next, updated_at: new Date().toISOString() }).eq('id', u.id);
-    await load();
+    await updateUserMutation.mutateAsync({ id: u.id, payload: { is_active: next, updated_at: new Date().toISOString() } });
   };
 
-  const filtered = users.filter((u) =>
+  const filtered = useMemo(() => users.filter((u) =>
     [u.email, u.first_name, u.last_name].some((v) =>
       (v ?? '').toLowerCase().includes(search.toLowerCase())
     )
-  );
+  ), [users, search]);
 
   return (
     <div className="max-w-5xl mx-auto">

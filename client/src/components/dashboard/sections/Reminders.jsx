@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { clientsApi, invoicesApi, remindersApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
 import { sendEmail, sendWhatsApp, buildReminderEmail } from '../../../lib/brevo';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/queryUtils';
 
 // ── Configuración de tipos ────────────────────────────────────────────
 const TYPES = {
@@ -63,10 +66,7 @@ const formatCOP = (n) =>
 
 export default function Reminders() {
   const { user, company } = useCompany();
-  const [reminders, setReminders]       = useState([]);
-  const [clients, setClients]           = useState([]);
-  const [pendingInvoices, setPendingInv] = useState([]); // cuentas de cobro pendientes
-  const [loading, setLoading]           = useState(true);
+  const queryClient = useQueryClient();
   const [modal, setModal]               = useState(null);
   const [form, setForm]                 = useState(EMPTY);
   const [saving, setSaving]             = useState(false);
@@ -85,34 +85,62 @@ export default function Reminders() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch]       = useState('');
 
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const [rem, cli, inv] = await Promise.all([
-      supabase
-        .from('bapesu_reminders')
-        .select('*, bapesu_clients(name, email, phone)')
-        .eq('company_id', company.id)
-        .order('scheduled_date', { ascending: true }),
-      supabase
-        .from('bapesu_clients')
-        .select('id, name')
-        .eq('company_id', company.id)
-        .order('name'),
-      supabase
-        .from('bapesu_invoices')
-        .select('id, number, client_id, client_name, client_nit, due_date, total, status')
-        .eq('company_id', company.id)
-        .in('status', ['draft', 'sent'])
-        .order('due_date', { ascending: true }),
-    ]);
-    setReminders(rem.data ?? []);
-    setClients(cli.data ?? []);
-    setPendingInv(inv.data ?? []);
-    setLoading(false);
-  }, [company]);
+  const remindersQuery = useQuery({
+    queryKey: queryKeys.company.reminders(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => remindersApi.list(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const clientsQuery = useQuery({
+    queryKey: queryKeys.company.clients(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => clientsApi.list(company.id).then(unwrapSupabaseResponse),
+  });
+
+  const pendingInvoicesQuery = useQuery({
+    queryKey: [...queryKeys.company.invoices(company?.id), 'pending-reminders'],
+    enabled: Boolean(company?.id),
+    queryFn: async () => {
+      const response = await invoicesApi.list(company.id);
+      if (response.error) throw response.error;
+      return (response.data ?? [])
+        .filter((invoice) => ['draft', 'sent'].includes(invoice.status))
+        .sort((a, b) => String(a.due_date ?? '').localeCompare(String(b.due_date ?? '')));
+    },
+  });
+
+  const reminders = remindersQuery.data ?? [];
+  const clients = clientsQuery.data ?? [];
+  const pendingInvoices = pendingInvoicesQuery.data ?? [];
+  const loading = remindersQuery.isLoading || clientsQuery.isLoading || pendingInvoicesQuery.isLoading;
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ mode, id, payload }) => {
+      const response = mode === 'add'
+        ? await remindersApi.create({ ...payload, company_id: company.id, created_by: user?.id ?? null })
+        : await remindersApi.update(id, payload);
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: invalidate,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await remindersApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      const response = await remindersApi.update(id, { status, updated_at: new Date().toISOString() });
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
 
   const setF = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -186,19 +214,7 @@ export default function Reminders() {
         status:         form.status,
         updated_at:     new Date().toISOString(),
       };
-      if (modal.mode === 'add') {
-        const { error: e } = await supabase
-          .from('bapesu_reminders')
-          .insert({ ...payload, company_id: company.id, created_by: user?.id ?? null });
-        if (e) throw e;
-      } else {
-        const { error: e } = await supabase
-          .from('bapesu_reminders')
-          .update(payload)
-          .eq('id', modal.id);
-        if (e) throw e;
-      }
-      await load();
+      await saveMutation.mutateAsync({ mode: modal.mode, id: modal.id, payload });
       closeModal();
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
@@ -208,13 +224,11 @@ export default function Reminders() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar este recordatorio?')) return;
-    await supabase.from('bapesu_reminders').delete().eq('id', id);
-    await load();
+    await deleteMutation.mutateAsync(id);
   };
 
   const handleStatus = async (r, status) => {
-    await supabase.from('bapesu_reminders').update({ status, updated_at: new Date().toISOString() }).eq('id', r.id);
-    await load();
+    await statusMutation.mutateAsync({ id: r.id, status });
   };
 
   // ── Envío Brevo ───────────────────────────────────────────────────
@@ -244,8 +258,7 @@ export default function Reminders() {
         await sendWhatsApp({ phone, text });
       }
       // Marcar como enviado
-      await supabase.from('bapesu_reminders').update({ status: 'sent', updated_at: new Date().toISOString() }).eq('id', r.id);
-      await load();
+      await statusMutation.mutateAsync({ id: r.id, status: 'sent' });
       setSendResult({ ok: true, channel, msg: channel === 'email' ? 'Email enviado correctamente' : 'WhatsApp enviado correctamente' });
     } catch (e) {
       setSendResult({ ok: false, channel, msg: e.message ?? 'Error al enviar' });
@@ -729,7 +742,7 @@ export default function Reminders() {
 
                         {invDropdown && invSearch.trim() && filteredInvoices.length === 0 && (
                           <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-xs text-gray-400">
-                            Sin resultados para "{invSearch}"
+                            Sin resultados para &quot;{invSearch}&quot;
                           </div>
                         )}
                       </div>

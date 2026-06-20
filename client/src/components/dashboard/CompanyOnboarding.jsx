@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
+import { db } from '../../api/db';
 import { useCompany } from '../../context/CompanyContext';
 
 const INPUT = 'w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 focus:border-yellow-400 transition';
@@ -27,7 +27,7 @@ export default function CompanyOnboarding() {
 
     setSaving(true);
     try {
-      const { data: company, error: insertErr } = await supabase
+      const { data: company, error: insertErr } = await db
         .from('bapesu_companies')
         .insert({
           name:      form.name.trim(),
@@ -44,7 +44,7 @@ export default function CompanyOnboarding() {
       if (insertErr) throw insertErr;
 
       // Vincular el usuario a la empresa recién creada como admin
-      await supabase
+      await db
         .from('users')
         .update({
           company_id: company.id,

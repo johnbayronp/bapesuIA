@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import { db } from '../../../../api/db';
 import { useCompany } from '../../../../context/CompanyContext';
 
 const PASS = '✅';
@@ -43,7 +43,7 @@ export default function InventoryTestPanel() {
 
     // ── HELPER: leer stock actual ──────────────────────────
     const getStock = async (pid) => {
-      const { data } = await supabase.from('bapesu_products').select('stock_available,purchase_price,sale_price').eq('id', pid).single();
+      const { data } = await db.from('bapesu_products').select('stock_available,purchase_price,sale_price').eq('id', pid).single();
       return data ?? null;
     };
     const round3 = (n) => +n.toFixed(3);
@@ -55,9 +55,9 @@ export default function InventoryTestPanel() {
       if (type === 'salida')   newStock = Math.max(round3(cur - qty), 0);
       if (type === 'traslado') newStock = cur;
       if (type === 'conteo')   newStock = Math.max(round3(countedQty), 0);
-      await supabase.from('bapesu_products').update({ stock_available: newStock }).eq('id', pid);
+      await db.from('bapesu_products').update({ stock_available: newStock }).eq('id', pid);
       const mvQty = type === 'salida' ? round3(-qty) : (type === 'conteo' ? round3(newStock - cur) : round3(qty));
-      if (mvQty !== 0) await supabase.from('bapesu_stock_movements').insert({ company_id: cid, product_id: pid, type: type === 'conteo' ? 'ajuste' : type, quantity: mvQty, created_by: uid });
+      if (mvQty !== 0) await db.from('bapesu_stock_movements').insert({ company_id: cid, product_id: pid, type: type === 'conteo' ? 'ajuste' : type, quantity: mvQty, created_by: uid });
       return newStock;
     };
 
@@ -74,7 +74,7 @@ export default function InventoryTestPanel() {
 
     // A1. Crear producto "Filamento PLA"
     {
-      const { data, error } = await supabase.from('bapesu_products').insert({
+      const { data, error } = await db.from('bapesu_products').insert({
         company_id: cid, created_by: uid,
         name: `${TEST_TAG} Filamento PLA 1.75mm`,
         sku: 'FIL-PLA-TST',
@@ -94,7 +94,7 @@ export default function InventoryTestPanel() {
 
     // A2. Crear proveedor
     {
-      const { data, error } = await supabase.from('bapesu_suppliers').insert({
+      const { data, error } = await db.from('bapesu_suppliers').insert({
         company_id: cid, name: `${TEST_TAG} Filamentos Colombia S.A.S`, is_active: true,
       }).select('id').single();
       if (error) log(R, 'A2. Crear proveedor', false, error.message);
@@ -104,7 +104,7 @@ export default function InventoryTestPanel() {
 
     // A3. Crear bodega
     {
-      const { data, error } = await supabase.from('bapesu_warehouses').insert({
+      const { data, error } = await db.from('bapesu_warehouses').insert({
         company_id: cid, name: `${TEST_TAG} Taller de impresión`, is_active: true, address: 'Oficina principal',
       }).select('id').single();
       if (error) log(R, 'A3. Crear bodega', false, error.message);
@@ -119,7 +119,7 @@ export default function InventoryTestPanel() {
 
     // B1. Entrada: compra 3 rollos de 1kg c/u → stock 0→3
     {
-      const { data: op, error } = await supabase.from('bapesu_inventory_ops').insert({
+      const { data: op, error } = await db.from('bapesu_inventory_ops').insert({
         company_id: cid, created_by: uid,
         type: 'entrada', reference: 'TST-ENT-001',
         op_date: new Date().toISOString().slice(0,10),
@@ -128,9 +128,9 @@ export default function InventoryTestPanel() {
       }).select('id').single();
       if (error) { log(R, 'B1. Registrar compra 3kg filamento', false, error.message); }
       else {
-        await supabase.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 3, unit_cost: 45000, position: 0 });
+        await db.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 3, unit_cost: 45000, position: 0 });
         const newStock = await applyOp(productId, 'entrada', 3);
-        await supabase.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
         log(R, `B1. Compra 3 rollos (3kg) → stock 0→${newStock} kg (esperado 3)`, newStock === 3,
           `Costo total: $${(3*45000).toLocaleString('es-CO')}`);
       }
@@ -139,7 +139,7 @@ export default function InventoryTestPanel() {
 
     // B2. Trabajo 1: se usan 0.8kg → stock 3→2.2
     {
-      const { data: op, error } = await supabase.from('bapesu_inventory_ops').insert({
+      const { data: op, error } = await db.from('bapesu_inventory_ops').insert({
         company_id: cid, created_by: uid,
         type: 'salida', reference: 'TST-SAL-001',
         op_date: new Date().toISOString().slice(0,10),
@@ -148,10 +148,10 @@ export default function InventoryTestPanel() {
       }).select('id').single();
       if (error) { log(R, 'B2. Trabajo 1 (uso 0.8kg)', false, error.message); }
       else {
-        await supabase.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 0.8, position: 0 });
+        await db.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 0.8, position: 0 });
         const curProd = await getStock(productId);
         const newStock = await applyOp(productId, 'salida', 0.8);
-        await supabase.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
        log(R, `B2. Trabajo 1: consumo 0.8kg → stock ${curProd.stock_available}→${newStock} kg (esperado 2.2)`,
          Math.abs(newStock - 2.2) < 0.001, 'Pieza mecánica cliente X');
       }
@@ -161,7 +161,7 @@ export default function InventoryTestPanel() {
     // B3. Trabajo 2: se usan 0.7kg → stock 2→1.3 (pero con Math.round queda 1)
     // Nota: stock_available es INTEGER, así que 2 - 0.7 = 1.3 → Math.round = 1
     {
-      const { data: op, error } = await supabase.from('bapesu_inventory_ops').insert({
+      const { data: op, error } = await db.from('bapesu_inventory_ops').insert({
         company_id: cid, created_by: uid,
         type: 'salida', reference: 'TST-SAL-002',
         op_date: new Date().toISOString().slice(0,10),
@@ -170,10 +170,10 @@ export default function InventoryTestPanel() {
       }).select('id').single();
       if (error) { log(R, 'B3. Trabajo 2 (uso 0.7kg)', false, error.message); }
       else {
-        await supabase.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 0.7, position: 0 });
+        await db.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 0.7, position: 0 });
         const curProd = await getStock(productId);
         const newStock = await applyOp(productId, 'salida', 0.7);
-        await supabase.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
         // 2 - round(0.7) = 2 - 1 = 1
        log(R, `B3. Trabajo 2: consumo 0.7kg → stock ${curProd.stock_available}→${newStock} kg (esperado 1.5)`,
          Math.abs(newStock - 1.5) < 0.001, `Prototipo cliente Y`);
@@ -211,15 +211,15 @@ export default function InventoryTestPanel() {
     // C1. Conteo con cantidad esperada y contada
     {
       const before = (await getStock(productId))?.stock_available ?? 0;
-      const { data: op } = await supabase.from('bapesu_inventory_ops').insert({
+      const { data: op } = await db.from('bapesu_inventory_ops').insert({
         company_id: cid, created_by: uid,
         type: 'conteo', reference: 'TST-CNT-001',
         op_date: new Date().toISOString().slice(0,10), status: 'borrador',
       }).select('id').single();
       if (op) {
-        await supabase.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: before, qty_counted: 2, position: 0 });
+        await db.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: before, qty_counted: 2, position: 0 });
         const newStock = await applyOp(productId, 'conteo', before, 2);
-        await supabase.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
         log(R, `C1. Conteo físico: esperado=${before}kg contado=2kg → stock fijado a ${newStock}kg`, newStock === 2,
           `Diferencia: ${2 - before}kg`);
         setResults(p => [...p, R[R.length-1]]);
@@ -228,15 +228,15 @@ export default function InventoryTestPanel() {
 
     // C2. Conteo sin cantidad esperada (qty=0, solo qty_counted)
     {
-      const { data: op } = await supabase.from('bapesu_inventory_ops').insert({
+      const { data: op } = await db.from('bapesu_inventory_ops').insert({
         company_id: cid, created_by: uid,
         type: 'conteo', reference: 'TST-CNT-002',
         op_date: new Date().toISOString().slice(0,10), status: 'borrador',
       }).select('id').single();
       if (op) {
-        await supabase.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 0, qty_counted: 1.5, position: 0 });
+        await db.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 0, qty_counted: 1.5, position: 0 });
         const newStock = await applyOp(productId, 'conteo', 0, 1.5);
-        await supabase.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
         log(R, `C2. Conteo qty_esperada=0, qty_contada=1.5 → stock fijado a ${newStock} (esperado 1.5)`,
           Math.abs(newStock - 1.5) < 0.001, 'NUMERIC: decimales exactos');
         setResults(p => [...p, R[R.length-1]]);
@@ -268,19 +268,19 @@ export default function InventoryTestPanel() {
     {
       // Crear una entrada de 5, confirmar, luego anular
       const before = (await getStock(productId))?.stock_available ?? 0;
-      const { data: op } = await supabase.from('bapesu_inventory_ops').insert({
+      const { data: op } = await db.from('bapesu_inventory_ops').insert({
         company_id: cid, created_by: uid,
         type: 'entrada', reference: 'TST-ENT-002',
         op_date: new Date().toISOString().slice(0,10), status: 'borrador',
       }).select('id').single();
       if (op) {
-        await supabase.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 5, unit_cost: 45000, position: 0 });
+        await db.from('bapesu_inventory_op_items').insert({ op_id: op.id, product_id: productId, quantity: 5, unit_cost: 45000, position: 0 });
         await applyOp(productId, 'entrada', 5);
-        await supabase.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'confirmado', confirmed_at: new Date().toISOString() }).eq('id', op.id);
         const afterEnter = (await getStock(productId))?.stock_available ?? 0; // before + 5
         // Ahora anular: revierte el +5
         const afterRevert = await applyOp(productId, 'salida', 5); // simula reversa
-        await supabase.from('bapesu_inventory_ops').update({ status: 'anulado' }).eq('id', op.id);
+        await db.from('bapesu_inventory_ops').update({ status: 'anulado' }).eq('id', op.id);
         log(R, `D3. Anular entrada +5: ${before}→${afterEnter}→${afterRevert} (esperado vuelta a ${before})`,
           afterRevert === before, `Reversa correcta`);
         setResults(p => [...p, R[R.length-1]]);
@@ -289,7 +289,7 @@ export default function InventoryTestPanel() {
 
     // D4. RLS: no puede ver datos de otra empresa
     {
-      const { data } = await supabase.from('bapesu_products').select('id').eq('company_id', '00000000-0000-0000-0000-000000000000');
+      const { data } = await db.from('bapesu_products').select('id').eq('company_id', '00000000-0000-0000-0000-000000000000');
       log(R, `D4. RLS: empresa ajena no tiene acceso`, (data ?? []).length === 0,
         `Registros visibles: ${(data ?? []).length} (debe ser 0)`);
       setResults(p => [...p, R[R.length-1]]);
@@ -301,7 +301,7 @@ export default function InventoryTestPanel() {
     setResults(p => [...p, { name: '── BLOQUE E: Historial ──', pass: null, detail: '' }]);
 
     {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('bapesu_stock_movements')
         .select('type,quantity')
         .eq('company_id', cid).eq('product_id', productId)
@@ -320,7 +320,7 @@ export default function InventoryTestPanel() {
     setResults(p => [...p, { name: '── BLOQUE F: Limpieza ──', pass: null, detail: '' }]);
     {
       await cleanupTestData(cid, TEST_TAG);
-      const { data } = await supabase.from('bapesu_products').select('id').eq('company_id', cid).ilike('name', `${TEST_TAG}%`);
+      const { data } = await db.from('bapesu_products').select('id').eq('company_id', cid).ilike('name', `${TEST_TAG}%`);
       log(R, 'F1. Limpieza completa', (data ?? []).length === 0,
         `Registros de prueba restantes: ${(data ?? []).length}`);
       setResults(p => [...p, R[R.length-1]]);
@@ -339,19 +339,19 @@ export default function InventoryTestPanel() {
 
   const cleanupTestData = async (cid, tag) => {
     // Primero obtenemos los productos de prueba
-    const { data: prods } = await supabase.from('bapesu_products').select('id').eq('company_id', cid).ilike('name', `${tag}%`);
+    const { data: prods } = await db.from('bapesu_products').select('id').eq('company_id', cid).ilike('name', `${tag}%`);
     for (const p of prods ?? []) {
-      await supabase.from('bapesu_stock_movements').delete().eq('product_id', p.id);
+      await db.from('bapesu_stock_movements').delete().eq('product_id', p.id);
     }
     // Operaciones de prueba
-    const { data: ops } = await supabase.from('bapesu_inventory_ops').select('id').eq('company_id', cid).ilike('reference', 'TST-%');
+    const { data: ops } = await db.from('bapesu_inventory_ops').select('id').eq('company_id', cid).ilike('reference', 'TST-%');
     for (const o of ops ?? []) {
-      await supabase.from('bapesu_inventory_op_items').delete().eq('op_id', o.id);
-      await supabase.from('bapesu_inventory_ops').delete().eq('id', o.id);
+      await db.from('bapesu_inventory_op_items').delete().eq('op_id', o.id);
+      await db.from('bapesu_inventory_ops').delete().eq('id', o.id);
     }
-    await supabase.from('bapesu_products').delete().eq('company_id', cid).ilike('name', `${tag}%`);
-    await supabase.from('bapesu_suppliers').delete().eq('company_id', cid).ilike('name', `${tag}%`);
-    await supabase.from('bapesu_warehouses').delete().eq('company_id', cid).ilike('name', `${tag}%`);
+    await db.from('bapesu_products').delete().eq('company_id', cid).ilike('name', `${tag}%`);
+    await db.from('bapesu_suppliers').delete().eq('company_id', cid).ilike('name', `${tag}%`);
+    await db.from('bapesu_warehouses').delete().eq('company_id', cid).ilike('name', `${tag}%`);
   };
 
   const handleClean = async () => {

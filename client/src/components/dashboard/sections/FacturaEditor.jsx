@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '../../../lib/supabase';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { clientsApi, facturasApi, servicesApi } from '../../../api';
 import { useCompany } from '../../../context/CompanyContext';
+import { evictNewEditorCache } from '../routeCacheApi';
+import { queryKeys } from '../../../lib/queryKeys';
+import { invalidateCompanyData, unwrapSupabaseCount, unwrapSupabaseResponse, unwrapSupabaseSingle } from '../../../lib/queryUtils';
 
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
@@ -30,23 +34,42 @@ export default function FacturaEditor() {
   const { id }   = useParams();
   const isEdit   = Boolean(id);
 
-  const [loading, setLoading] = useState(isEdit);
-  const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState('');
 
   const [fac, setFac]         = useState(DEFAULT_FAC);
   const [items, setItems]     = useState([newItem()]);
   const [clientId, setClientId] = useState(null);
-  const [clients, setClients]   = useState([]);
-  const [services, setServices] = useState([]);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!company?.id) return;
-    Promise.all([
-      supabase.from('bapesu_clients').select('id,name,nit,email,phone,address').eq('company_id', company.id).order('name'),
-      supabase.from('bapesu_services').select('id,name,default_price,unit,is_active').eq('company_id', company.id).eq('is_active', true).order('name'),
-    ]).then(([c, s]) => { setClients(c.data ?? []); setServices(s.data ?? []); });
-  }, [company]);
+  const clientsQuery = useQuery({
+    queryKey: [...queryKeys.company.clients(company?.id), 'select'],
+    enabled: Boolean(company?.id),
+    queryFn: () => clientsApi.listForSelect(company.id, 'id,name,nit,email,phone,address').then(unwrapSupabaseResponse),
+  });
+  const servicesQuery = useQuery({
+    queryKey: [...queryKeys.company.services(company?.id), 'active-select'],
+    enabled: Boolean(company?.id),
+    queryFn: () => servicesApi.listActiveForSelect(company.id, 'id,name,default_price,unit,is_active').then(unwrapSupabaseResponse),
+  });
+  const nextNumberQuery = useQuery({
+    queryKey: [...queryKeys.company.facturas(company?.id), 'next-number'],
+    enabled: Boolean(company?.id) && !isEdit,
+    queryFn: () => facturasApi.countByCompany(company.id).then(unwrapSupabaseCount),
+  });
+  const facturaQuery = useQuery({
+    queryKey: queryKeys.company.factura(id),
+    enabled: Boolean(company?.id) && isEdit,
+    queryFn: async () => {
+      const [factura, facturaItems] = await Promise.all([
+        facturasApi.get(id).then(unwrapSupabaseSingle),
+        facturasApi.getItems(id).then(unwrapSupabaseResponse),
+      ]);
+      return { factura, facturaItems };
+    },
+  });
+
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+  const services = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
 
   useEffect(() => {
     if (isEdit || !company) return;
@@ -54,15 +77,13 @@ export default function FacturaEditor() {
   }, [company, isEdit]);
 
   useEffect(() => {
-    if (isEdit || !company?.id) return;
-    supabase.from('bapesu_facturas').select('id', { count: 'exact', head: true }).eq('company_id', company.id)
-      .then(({ count }) => setFac((p) => ({ ...p, number: String((count ?? 0) + 1).padStart(3, '0') })));
-  }, [isEdit, company]);
+    if (isEdit || nextNumberQuery.data == null) return;
+    setFac((p) => ({ ...p, number: String((nextNumberQuery.data ?? 0) + 1).padStart(3, '0') }));
+  }, [isEdit, nextNumberQuery.data]);
 
-  const loadFac = useCallback(async () => {
-    if (!isEdit || !company?.id) return;
-    setLoading(true);
-    const { data: q } = await supabase.from('bapesu_facturas').select('*').eq('id', id).maybeSingle();
+  useEffect(() => {
+    if (!isEdit) return;
+    const q = facturaQuery.data?.factura;
     if (q) {
       setFac({
         prefix: q.prefix ?? 'FAC', number: q.number ?? '',
@@ -75,14 +96,10 @@ export default function FacturaEditor() {
         status: q.status ?? 'draft',
       });
       setClientId(q.client_id ?? null);
-      const { data: its } = await supabase.from('bapesu_factura_items').select('*').eq('factura_id', id).order('position');
+      const its = facturaQuery.data?.facturaItems ?? [];
       setItems(its?.length ? its.map((i) => ({ service_id: i.service_id, description: i.description, quantity: Number(i.quantity), price: Number(i.price), position: i.position })) : [newItem()]);
     }
-    setLoading(false);
-  }, [isEdit, id, company]);
-
-  useEffect(() => { loadFac(); }, [loadFac]);
-
+  }, [facturaQuery.data, isEdit]);
   const setF = (k, v) => setFac((p) => ({ ...p, [k]: v }));
   const updateItem  = (i, k, v) => setItems((p) => p.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
   const removeItem  = (i)       => setItems((p) => p.length > 1 ? p.filter((_, idx) => idx !== i) : p);
@@ -104,11 +121,9 @@ export default function FacturaEditor() {
   const reteICA     = fac.include_reteica ? subtotal * (Number(fac.reteica_rate) || 0) / 100 : 0;
   const total       = subtotal + ivaAmt - reteFuente - reteIVA - reteICA;
 
-  // ── Guardar ───────────────────────────────────────────────────────────
-  const handleSave = async (status = fac.status) => {
-    if (!company?.id) { setError('No tienes empresa asociada'); return; }
-    setSaving(true); setError('');
-    try {
+  // Guardar
+  const saveMutation = useMutation({
+    mutationFn: async (status = fac.status) => {
       const payload = {
         company_id: company.id, client_id: clientId,
         client_name: selectedClient?.name ?? null, client_nit: selectedClient?.nit ?? null,
@@ -128,37 +143,56 @@ export default function FacturaEditor() {
 
       let facId = id;
       if (isEdit) {
-        const { error: e } = await supabase.from('bapesu_facturas').update(payload).eq('id', id);
+        const { error: e } = await facturasApi.update(id, payload);
         if (e) throw e;
       } else {
-        const { data, error: e } = await supabase.from('bapesu_facturas').insert({ ...payload, created_by: user?.id ?? null }).select('id').single();
+        const { data, error: e } = await facturasApi.createId({ ...payload, created_by: user?.id ?? null });
         if (e) throw e;
         facId = data.id;
       }
 
-      await supabase.from('bapesu_factura_items').delete().eq('factura_id', facId);
+      const removeRes = await facturasApi.removeItems(facId);
+      if (removeRes.error) throw removeRes.error;
       const itemsPayload = items
         .filter((i) => i.description.trim() || i.price > 0)
         .map((i, idx) => ({
           factura_id: facId, service_id: i.service_id,
-          description: i.description.trim() || 'Sin descripción',
+          description: i.description.trim() || 'Sin descripci?n',
           quantity: Number(i.quantity) || 1, price: Number(i.price) || 0, position: idx,
         }));
       if (itemsPayload.length) {
-        const { error: e } = await supabase.from('bapesu_factura_items').insert(itemsPayload);
+        const { error: e } = await facturasApi.addItems(itemsPayload);
         if (e) throw e;
       }
 
-      if (!isEdit) navigate(`/dashboard/cobros/facturas/${facId}`, { replace: true });
-      else await loadFac();
-    } catch (e) { setError(e.message ?? 'Error al guardar'); }
-    setSaving(false);
-  };
+      return facId;
+    },
+    onSuccess: async (facId) => {
+      await invalidateCompanyData(queryClient, company?.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.company.factura(facId) });
+      if (!isEdit) {
+        evictNewEditorCache('factura');
+        navigate(`/dashboard/cobros/facturas/${facId}`, { replace: true });
+      } else {
+        await facturaQuery.refetch();
+      }
+    },
+  });
 
+  const handleSave = async (status = fac.status) => {
+    if (!company?.id) { setError('No tienes empresa asociada'); return; }
+    setError('');
+    try {
+      await saveMutation.mutateAsync(status);
+    } catch (e) { setError(e.message ?? 'Error al guardar'); }
+  };
   const handlePrint = async () => {
     if (!isEdit) await handleSave();
     window.print();
   };
+
+  const loading = (isEdit && facturaQuery.isLoading) || clientsQuery.isLoading || servicesQuery.isLoading;
+  const saving = saveMutation.isPending;
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
@@ -175,7 +209,7 @@ export default function FacturaEditor() {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap no-print">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard/cobros?tab=facturas')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
+          <button onClick={() => { evictNewEditorCache('factura'); navigate('/dashboard/cobros?tab=facturas'); }} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             Volver
           </button>

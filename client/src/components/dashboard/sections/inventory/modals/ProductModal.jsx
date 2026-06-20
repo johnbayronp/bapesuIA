@@ -1,12 +1,40 @@
 import React from 'react';
 import { INPUT, LABEL, UNITS, formatPriceCOP, parsePriceCOP } from '../constants';
 
-export default function ProductModal({ modal, form, setF, categories, warehouses = [], suppliers = [], onSave, onClose, saving, error }) {
+export default function ProductModal({
+  modal,
+  form,
+  setF,
+  categories,
+  warehouses = [],
+  suppliers = [],
+  photoFile,
+  onPhotoChange,
+  onSave,
+  onClose,
+  saving,
+  error,
+}) {
+  const [photoPreview, setPhotoPreview] = React.useState('');
+
+  React.useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreview('');
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(photoFile);
+    setPhotoPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [photoFile]);
+
   if (!modal) return null;
+
+  const displayPhotoUrl = photoPreview || form.photo_url;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" /> 
       <div className="relative w-full max-w-2xl bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
         <div className="h-1 w-full bg-gradient-to-r from-indigo-500 to-violet-500" />
 
@@ -63,8 +91,49 @@ export default function ProductModal({ modal, form, setF, categories, warehouses
                   </div>
                 </div>
                 <div>
-                  <label className={LABEL}>URL de foto</label>
-                  <input className={INPUT} value={form.photo_url} onChange={(e) => setF('photo_url', e.target.value)} placeholder="https://..." />
+                  <label className={LABEL}>Foto del producto</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="w-full sm:w-32 h-32 rounded-2xl border border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+                      {displayPhotoUrl ? (
+                        <img src={displayPhotoUrl} alt={form.name || 'Foto del producto'} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center px-3">
+                          <svg className="w-8 h-8 mx-auto text-gray-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-[11px] text-gray-400">Sin foto</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-xl file:border-0 file:bg-indigo-50 file:px-3 file:py-2.5 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
+                        onChange={(e) => onPhotoChange?.(e.target.files?.[0] ?? null)}
+                      />
+                      <p className="text-[11px] text-gray-400 mt-2">
+                        Maximo 5 MB.
+                      </p>
+                      {photoFile && (
+                        <p className="text-xs text-indigo-600 font-medium mt-2 truncate">
+                          Seleccionada: {photoFile.name}
+                        </p>
+                      )}
+                      {displayPhotoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onPhotoChange?.(null);
+                            setF('photo_url', '');
+                          }}
+                          className="mt-3 text-xs font-semibold text-red-500 hover:text-red-600"
+                        >
+                          Quitar foto
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

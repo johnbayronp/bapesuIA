@@ -1,45 +1,108 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
+import { queryKeys } from '../../../../lib/queryKeys';
+import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
+import { uploadToS3 } from '../../../../lib/s3Upload';
 import { EMPTY_PRODUCT, EMPTY_CATEGORY } from './constants';
+import { persistInventoryUi, readInventoryUi } from './modalStorage';
+
+const INVENTORY_PHOTOS_FOLDER = 'inventory_photos';
+const INVENTORY_PHOTO_UPLOAD_MAX_BYTES = 1024 * 1024;
+const MAX_PRODUCT_PHOTO_SIZE = 5 * 1024 * 1024;
 
 export function useInventory() {
   const { user, company } = useCompany();
+  const queryClient = useQueryClient();
+  const storedUi = readInventoryUi(company?.id);
 
-  const [products,   setProducts]   = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [movements,  setMovements]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [deleting,   setDeleting]   = useState(null);
   const [error,      setError]      = useState('');
 
   // Modales
-  const [productModal,  setProductModal]  = useState(null); // null | { mode, id? }
-  const [categoryModal, setCategoryModal] = useState(null);
-  const [stockModal,    setStockModal]    = useState(null); // { product }
+  const [productModal,  setProductModal]  = useState(storedUi?.productModal ?? null);
+  const [categoryModal, setCategoryModal] = useState(storedUi?.categoryModal ?? null);
+  const [stockModal,    setStockModal]    = useState(storedUi?.stockModal ?? null);
 
   // Formularios
-  const [productForm,  setProductForm]  = useState(EMPTY_PRODUCT);
-  const [categoryForm, setCategoryForm] = useState(EMPTY_CATEGORY);
-  const [stockForm,    setStockForm]    = useState({ type: 'entrada', quantity: '', notes: '' });
+  const [productForm,  setProductForm]  = useState(storedUi?.productForm ?? EMPTY_PRODUCT);
+  const [categoryForm, setCategoryForm] = useState(storedUi?.categoryForm ?? EMPTY_CATEGORY);
+  const [stockForm,    setStockForm]    = useState(storedUi?.stockForm ?? { type: 'entrada', quantity: '', notes: '' });
+  const [productPhotoFile, setProductPhotoFile] = useState(null);
+
+  useEffect(() => {
+    persistInventoryUi(company?.id, {
+      productModal,
+      productForm,
+      categoryModal,
+      categoryForm,
+      stockModal,
+      stockForm,
+    });
+  }, [company?.id, productModal, productForm, categoryModal, categoryForm, stockModal, stockForm]);
 
   // ── Carga ───────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const [prod, cat, mov] = await Promise.all([
-      inventoryApi.listProducts(company.id),
-      inventoryApi.listCategories(company.id),
-      inventoryApi.listMovements(company.id),
-    ]);
-    setProducts(prod.data  ?? []);
-    setCategories(cat.data ?? []);
-    setMovements(mov.data  ?? []);
-    setLoading(false);
-  }, [company]);
+  const productsQuery = useQuery({
+    queryKey: queryKeys.company.inventory.products(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => inventoryApi.listProducts(company.id).then(unwrapSupabaseResponse),
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const categoriesQuery = useQuery({
+    queryKey: queryKeys.company.inventory.categories(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => inventoryApi.listCategories(company.id).then(unwrapSupabaseResponse),
+  });
+
+  const movementsQuery = useQuery({
+    queryKey: queryKeys.company.inventory.movements(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => inventoryApi.listMovements(company.id).then(unwrapSupabaseResponse),
+  });
+
+  const products = productsQuery.data ?? EMPTY_ARRAY;
+  const categories = categoriesQuery.data ?? EMPTY_ARRAY;
+  const movements = movementsQuery.data ?? EMPTY_ARRAY;
+  const loading = productsQuery.isLoading || categoriesQuery.isLoading || movementsQuery.isLoading;
+  const load = () => invalidateCompanyData(queryClient, company?.id);
+
+  const productMutation = useMutation({
+    mutationFn: async ({ action, id, payload }) => {
+      const response = action === 'create'
+        ? await inventoryApi.createProduct(payload)
+        : action === 'delete'
+        ? await inventoryApi.deleteProduct(id)
+        : await inventoryApi.updateProduct(id, payload);
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: load,
+  });
+
+  const categoryMutation = useMutation({
+    mutationFn: async ({ action, id, payload }) => {
+      const response = action === 'create'
+        ? await inventoryApi.createCategory(payload)
+        : action === 'delete'
+        ? await inventoryApi.deleteCategory(id)
+        : await inventoryApi.updateCategory(id, payload);
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: load,
+  });
+
+  const stockMutation = useMutation({
+    mutationFn: async ({ productId, stockPayload, movementPayload }) => {
+      const productResponse = await inventoryApi.updateProduct(productId, stockPayload);
+      if (productResponse.error) throw productResponse.error;
+      const movementResponse = await inventoryApi.addMovement(movementPayload);
+      if (movementResponse.error) throw movementResponse.error;
+    },
+    onSuccess: load,
+  });
 
   // ── Helpers de form ─────────────────────────────────────────
   const setPF = (k, v) => setProductForm((p)  => ({ ...p, [k]: v }));
@@ -49,6 +112,7 @@ export function useInventory() {
   // ── Modal Producto ──────────────────────────────────────────
   const openAddProduct = () => {
     setProductForm(EMPTY_PRODUCT);
+    setProductPhotoFile(null);
     setError('');
     setProductModal({ mode: 'add' });
   };
@@ -72,16 +136,49 @@ export function useInventory() {
       sale_price:       String(p.sale_price ?? ''),
       tax_rate:         p.tax_rate ?? 19,
     });
+    setProductPhotoFile(null);
     setError('');
     setProductModal({ mode: 'edit', id: p.id });
   };
-  const closeProductModal = () => { setProductModal(null); setError(''); };
+  const closeProductModal = () => {
+    setProductModal(null);
+    setProductPhotoFile(null);
+    setError('');
+  };
+
+  const handleProductPhotoChange = (file) => {
+    if (!file) {
+      setProductPhotoFile(null);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Selecciona un archivo de imagen válido');
+      return;
+    }
+    if (file.size > MAX_PRODUCT_PHOTO_SIZE) {
+      setError('La imagen debe pesar máximo 5 MB');
+      return;
+    }
+    setError('');
+    setProductPhotoFile(file);
+  };
 
   // ── Guardar producto ────────────────────────────────────────
   const handleSaveProduct = async () => {
     if (!productForm.name.trim()) { setError('El nombre es obligatorio'); return; }
     setSaving(true); setError('');
     try {
+      let photoUrl = productForm.photo_url.trim() || null;
+      if (productPhotoFile) {
+        const prefix = productModal.mode === 'edit'
+          ? productModal.id
+          : company.id;
+        photoUrl = await uploadToS3(productPhotoFile, prefix, {
+          folder: INVENTORY_PHOTOS_FOLDER,
+          maxBytes: INVENTORY_PHOTO_UPLOAD_MAX_BYTES,
+        });
+      }
+
       const payload = {
         name:             productForm.name.trim(),
         sku:              productForm.sku.trim() || null,
@@ -89,7 +186,7 @@ export function useInventory() {
         description:      productForm.description.trim() || null,
         category_id:      productForm.category_id || null,
         unit:             productForm.unit || 'unidad',
-        photo_url:        productForm.photo_url.trim() || null,
+        photo_url:        photoUrl,
         is_active:        productForm.is_active,
         stock_available:  Number(productForm.stock_available) || 0,
         stock_reserved:   Number(productForm.stock_reserved)  || 0,
@@ -103,13 +200,13 @@ export function useInventory() {
         updated_at:       new Date().toISOString(),
       };
       if (productModal.mode === 'add') {
-        const { error: e } = await inventoryApi.createProduct({ ...payload, company_id: company.id, created_by: user?.id ?? null });
-        if (e) throw e;
+        await productMutation.mutateAsync({
+          action: 'create',
+          payload: { ...payload, company_id: company.id, created_by: user?.id ?? null },
+        });
       } else {
-        const { error: e } = await inventoryApi.updateProduct(productModal.id, payload);
-        if (e) throw e;
+        await productMutation.mutateAsync({ action: 'update', id: productModal.id, payload });
       }
-      await load();
       closeProductModal();
     } catch (e) { setError(e.message ?? 'Error al guardar'); }
     setSaving(false);
@@ -118,14 +215,12 @@ export function useInventory() {
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('¿Eliminar este producto?')) return;
     setDeleting(id);
-    await inventoryApi.deleteProduct(id);
-    await load();
+    await productMutation.mutateAsync({ action: 'delete', id });
     setDeleting(null);
   };
 
   const handleToggleProduct = async (p) => {
-    await inventoryApi.updateProduct(p.id, { is_active: !p.is_active });
-    await load();
+    await productMutation.mutateAsync({ action: 'update', id: p.id, payload: { is_active: !p.is_active } });
   };
 
   // ── Modal Categoría ─────────────────────────────────────────
@@ -152,13 +247,10 @@ export function useInventory() {
         parent_id:   categoryForm.parent_id || null,
       };
       if (categoryModal.mode === 'add') {
-        const { error: e } = await inventoryApi.createCategory({ ...payload, company_id: company.id });
-        if (e) throw e;
+        await categoryMutation.mutateAsync({ action: 'create', payload: { ...payload, company_id: company.id } });
       } else {
-        const { error: e } = await inventoryApi.updateCategory(categoryModal.id, payload);
-        if (e) throw e;
+        await categoryMutation.mutateAsync({ action: 'update', id: categoryModal.id, payload });
       }
-      await load();
       closeCategoryModal();
     } catch (e) { setError(e.message ?? 'Error al guardar'); }
     setSaving(false);
@@ -166,8 +258,7 @@ export function useInventory() {
 
   const handleDeleteCategory = async (id) => {
     if (!window.confirm('¿Eliminar esta categoría? Los productos vinculados quedarán sin categoría.')) return;
-    await inventoryApi.deleteCategory(id);
-    await load();
+    await categoryMutation.mutateAsync({ action: 'delete', id });
   };
 
   // ── Modal Stock ─────────────────────────────────────────────
@@ -191,16 +282,18 @@ export function useInventory() {
         ? Math.max(+((current - qty).toFixed(3)), 0)
         : +qty.toFixed(3); // ajuste directo
 
-      await inventoryApi.updateProduct(p.id, { stock_available: newStock, updated_at: new Date().toISOString() });
-      await inventoryApi.addMovement({
-        company_id: company.id,
-        product_id: p.id,
-        type:       stockForm.type,
-        quantity:   stockForm.type === 'salida' ? -qty : qty,
-        notes:      stockForm.notes.trim() || null,
-        created_by: user?.id ?? null,
+      await stockMutation.mutateAsync({
+        productId: p.id,
+        stockPayload: { stock_available: newStock, updated_at: new Date().toISOString() },
+        movementPayload: {
+          company_id: company.id,
+          product_id: p.id,
+          type:       stockForm.type,
+          quantity:   stockForm.type === 'salida' ? -qty : qty,
+          notes:      stockForm.notes.trim() || null,
+          created_by: user?.id ?? null,
+        },
       });
-      await load();
       closeStockModal();
     } catch (e) { setError(e.message ?? 'Error al ajustar stock'); }
     setSaving(false);
@@ -209,7 +302,7 @@ export function useInventory() {
   return {
     products, categories, movements, loading, saving, deleting, error,
     // product modal
-    productModal, productForm, setPF,
+    productModal, productForm, productPhotoFile, setPF, handleProductPhotoChange,
     openAddProduct, openEditProduct, closeProductModal,
     handleSaveProduct, handleDeleteProduct, handleToggleProduct,
     // category modal

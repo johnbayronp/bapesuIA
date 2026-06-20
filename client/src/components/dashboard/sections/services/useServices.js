@@ -1,38 +1,60 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { servicesApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
+import { queryKeys } from '../../../../lib/queryKeys';
+import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
 import { EMPTY_SERVICE } from './constants';
 
 export function useServices() {
   const { user, company } = useCompany();
+  const queryClient = useQueryClient();
 
-  const [services, setServices] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
   const [deleting, setDeleting] = useState(null);
-  const [error, setError]       = useState('');
-  const [search, setSearch]     = useState('');
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState(EMPTY_SERVICE);
 
-  // Modal state
-  const [modal, setModal] = useState(null); // null | { mode: 'add' | 'edit', id?: string }
-  const [form, setForm]   = useState(EMPTY_SERVICE);
+  const servicesQuery = useQuery({
+    queryKey: queryKeys.company.services(company?.id),
+    enabled: Boolean(company?.id),
+    queryFn: () => servicesApi.list(company.id).then(unwrapSupabaseResponse),
+  });
 
-  // ── Data fetching ──────────────────────────────────────────────
-  const load = useCallback(async () => {
-    if (!company?.id) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('bapesu_services')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false });
-    setServices(data ?? []);
-    setLoading(false);
-  }, [company]);
+  const invalidate = () => invalidateCompanyData(queryClient, company?.id);
 
-  useEffect(() => { load(); }, [load]);
+  const saveMutation = useMutation({
+    mutationFn: async ({ mode, id, payload }) => {
+      const response = mode === 'add'
+        ? await servicesApi.create({ ...payload, company_id: company.id, created_by: user?.id ?? null })
+        : await servicesApi.update(id, payload);
+      if (response.error) throw response.error;
+      return response.data ?? null;
+    },
+    onSuccess: invalidate,
+  });
 
-  // ── Form helpers ───────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await servicesApi.remove(id);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (service) => {
+      const response = await servicesApi.toggleActive(service.id, !service.is_active);
+      if (response.error) throw response.error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const services = servicesQuery.data ?? EMPTY_ARRAY;
+  const loading = servicesQuery.isLoading;
+  const saving = saveMutation.isPending || toggleMutation.isPending;
+
   const setF = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const openAdd = () => {
@@ -43,11 +65,11 @@ export function useServices() {
 
   const openEdit = (service) => {
     setForm({
-      name:          service.name,
-      description:   service.description ?? '',
+      name: service.name,
+      description: service.description ?? '',
       default_price: String(service.default_price ?? 0),
-      unit:          service.unit ?? '',
-      is_active:     service.is_active ?? true,
+      unit: service.unit ?? '',
+      is_active: service.is_active ?? true,
     });
     setError('');
     setModal({ mode: 'edit', id: service.id });
@@ -58,82 +80,66 @@ export function useServices() {
     setError('');
   };
 
-  // ── CRUD ───────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.name.trim()) { setError('El nombre es obligatorio'); return; }
-    if (!company?.id)      { setError('No tienes empresa asociada'); return; }
-    setSaving(true);
+    if (!form.name.trim()) {
+      setError('El nombre es obligatorio');
+      return;
+    }
+    if (!company?.id) {
+      setError('No tienes empresa asociada');
+      return;
+    }
     setError('');
     try {
       const payload = {
-        name:          form.name.trim(),
-        description:   form.description.trim() || null,
+        name: form.name.trim(),
+        description: form.description.trim() || null,
         default_price: parseFloat(form.default_price) || 0,
-        unit:          form.unit.trim() || null,
-        is_active:     form.is_active,
+        unit: form.unit.trim() || null,
+        is_active: form.is_active,
       };
-      if (modal.mode === 'add') {
-        const { error: e } = await supabase
-          .from('bapesu_services')
-          .insert({ ...payload, company_id: company.id, created_by: user?.id ?? null });
-        if (e) throw e;
-      } else {
-        const { error: e } = await supabase
-          .from('bapesu_services')
-          .update(payload)
-          .eq('id', modal.id);
-        if (e) throw e;
-      }
-      await load();
+      await saveMutation.mutateAsync({ mode: modal.mode, id: modal.id, payload });
       closeModal();
     } catch (e) {
       setError(e.message ?? 'Error al guardar');
     }
-    setSaving(false);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('¿Eliminar este servicio? Las cotizaciones existentes no se ven afectadas.')) return;
     setDeleting(id);
-    await supabase.from('bapesu_services').delete().eq('id', id);
-    await load();
-    setDeleting(null);
+    try {
+      await deleteMutation.mutateAsync(id);
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const handleToggleActive = async (service) => {
-    await supabase
-      .from('bapesu_services')
-      .update({ is_active: !service.is_active })
-      .eq('id', service.id);
-    await load();
+    await toggleMutation.mutateAsync(service);
   };
 
-  // ── Filtered list ──────────────────────────────────────────────
-  const filtered = services.filter((s) =>
+  const filtered = useMemo(() => services.filter((s) =>
     [s.name, s.description, s.unit].some((v) =>
       (v ?? '').toLowerCase().includes(search.toLowerCase())
     )
-  );
+  ), [services, search]);
 
   return {
-    // data
     services,
     filtered,
     loading,
     saving,
     deleting,
     error,
-    // search
     search,
     setSearch,
-    // modal
     modal,
     form,
     setF,
     openAdd,
     openEdit,
     closeModal,
-    // actions
     handleSave,
     handleDelete,
     handleToggleActive,
