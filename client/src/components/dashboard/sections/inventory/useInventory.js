@@ -4,8 +4,13 @@ import { inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
+import { uploadToS3 } from '../../../../lib/s3Upload';
 import { EMPTY_PRODUCT, EMPTY_CATEGORY } from './constants';
 import { persistInventoryUi, readInventoryUi } from './modalStorage';
+
+const INVENTORY_PHOTOS_FOLDER = 'inventory_photos';
+const INVENTORY_PHOTO_UPLOAD_MAX_BYTES = 1024 * 1024;
+const MAX_PRODUCT_PHOTO_SIZE = 5 * 1024 * 1024;
 
 export function useInventory() {
   const { user, company } = useCompany();
@@ -25,6 +30,7 @@ export function useInventory() {
   const [productForm,  setProductForm]  = useState(storedUi?.productForm ?? EMPTY_PRODUCT);
   const [categoryForm, setCategoryForm] = useState(storedUi?.categoryForm ?? EMPTY_CATEGORY);
   const [stockForm,    setStockForm]    = useState(storedUi?.stockForm ?? { type: 'entrada', quantity: '', notes: '' });
+  const [productPhotoFile, setProductPhotoFile] = useState(null);
 
   useEffect(() => {
     persistInventoryUi(company?.id, {
@@ -106,6 +112,7 @@ export function useInventory() {
   // ── Modal Producto ──────────────────────────────────────────
   const openAddProduct = () => {
     setProductForm(EMPTY_PRODUCT);
+    setProductPhotoFile(null);
     setError('');
     setProductModal({ mode: 'add' });
   };
@@ -129,16 +136,49 @@ export function useInventory() {
       sale_price:       String(p.sale_price ?? ''),
       tax_rate:         p.tax_rate ?? 19,
     });
+    setProductPhotoFile(null);
     setError('');
     setProductModal({ mode: 'edit', id: p.id });
   };
-  const closeProductModal = () => { setProductModal(null); setError(''); };
+  const closeProductModal = () => {
+    setProductModal(null);
+    setProductPhotoFile(null);
+    setError('');
+  };
+
+  const handleProductPhotoChange = (file) => {
+    if (!file) {
+      setProductPhotoFile(null);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Selecciona un archivo de imagen válido');
+      return;
+    }
+    if (file.size > MAX_PRODUCT_PHOTO_SIZE) {
+      setError('La imagen debe pesar máximo 5 MB');
+      return;
+    }
+    setError('');
+    setProductPhotoFile(file);
+  };
 
   // ── Guardar producto ────────────────────────────────────────
   const handleSaveProduct = async () => {
     if (!productForm.name.trim()) { setError('El nombre es obligatorio'); return; }
     setSaving(true); setError('');
     try {
+      let photoUrl = productForm.photo_url.trim() || null;
+      if (productPhotoFile) {
+        const prefix = productModal.mode === 'edit'
+          ? productModal.id
+          : company.id;
+        photoUrl = await uploadToS3(productPhotoFile, prefix, {
+          folder: INVENTORY_PHOTOS_FOLDER,
+          maxBytes: INVENTORY_PHOTO_UPLOAD_MAX_BYTES,
+        });
+      }
+
       const payload = {
         name:             productForm.name.trim(),
         sku:              productForm.sku.trim() || null,
@@ -146,7 +186,7 @@ export function useInventory() {
         description:      productForm.description.trim() || null,
         category_id:      productForm.category_id || null,
         unit:             productForm.unit || 'unidad',
-        photo_url:        productForm.photo_url.trim() || null,
+        photo_url:        photoUrl,
         is_active:        productForm.is_active,
         stock_available:  Number(productForm.stock_available) || 0,
         stock_reserved:   Number(productForm.stock_reserved)  || 0,
@@ -262,7 +302,7 @@ export function useInventory() {
   return {
     products, categories, movements, loading, saving, deleting, error,
     // product modal
-    productModal, productForm, setPF,
+    productModal, productForm, productPhotoFile, setPF, handleProductPhotoChange,
     openAddProduct, openEditProduct, closeProductModal,
     handleSaveProduct, handleDeleteProduct, handleToggleProduct,
     // category modal

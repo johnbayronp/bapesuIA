@@ -160,6 +160,8 @@ export default function InventoryModule() {
         categories={inv.categories}
         warehouses={ops.warehouses}
         suppliers={ops.suppliers}
+        photoFile={inv.productPhotoFile}
+        onPhotoChange={inv.handleProductPhotoChange}
         onSave={inv.handleSaveProduct}
         onClose={inv.closeProductModal}
         saving={inv.saving}
