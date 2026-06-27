@@ -10,6 +10,20 @@ import { invalidateCompanyData, unwrapSupabaseResponse } from '../../../lib/quer
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
 
+const EMPTY_DOCS = [];
+
+const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
+
+const getDocMonth = (doc) => (doc.issue_date || doc.created_at || '').slice(0, 7);
+
+const formatMonthLabel = (month) => {
+  if (month === 'all') return 'Todos los meses';
+  return new Date(`${month}-01T12:00:00`).toLocaleDateString('es-CO', {
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
 // ── Status configs ────────────────────────────────────────────────────
 const INV_STATUS = {
   draft:     { label: 'Borrador', bg: 'bg-gray-100',    text: 'text-gray-600',    dot: 'bg-gray-400' },
@@ -49,6 +63,7 @@ export default function CobrosModule() {
   // ── Estado compartido ─────────────────────────────────────────────
   const [search,    setSearch]    = useState('');
   const [statusFilter, setStatus] = useState('all');
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonth());
   const [deleting,  setDeleting]  = useState(null);
 
   const invoicesQuery = useQuery({
@@ -63,8 +78,8 @@ export default function CobrosModule() {
     queryFn: () => facturasApi.list(company.id).then(unwrapSupabaseResponse),
   });
 
-  const invoices = invoicesQuery.data ?? [];
-  const facturas = facturasQuery.data ?? [];
+  const invoices = invoicesQuery.data ?? EMPTY_DOCS;
+  const facturas = facturasQuery.data ?? EMPTY_DOCS;
   const loading = invoicesQuery.isLoading || facturasQuery.isLoading;
   const invalidate = () => invalidateCompanyData(queryClient, company?.id);
   const convertInvoice = useConvertInvoiceToFactura(company?.id);
@@ -144,7 +159,29 @@ export default function CobrosModule() {
   // ── Datos del tab activo ──────────────────────────────────────────
   const tab    = TABS.find((t) => t.id === activeTab);
   const list   = activeTab === 'invoices' ? invoices : facturas;
+  const allDocs = useMemo(() => [...invoices, ...facturas], [invoices, facturas]);
+  const monthOptions = useMemo(() => {
+    const months = new Set([getCurrentMonth()]);
+    allDocs.forEach((doc) => {
+      const month = getDocMonth(doc);
+      if (month) months.add(month);
+    });
+    return [...months].sort((a, b) => b.localeCompare(a));
+  }, [allDocs]);
+  const periodDocs = useMemo(() => (
+    monthFilter === 'all' ? allDocs : allDocs.filter((d) => getDocMonth(d) === monthFilter)
+  ), [allDocs, monthFilter]);
+  const periodList = useMemo(() => (
+    monthFilter === 'all' ? list : list.filter((d) => getDocMonth(d) === monthFilter)
+  ), [list, monthFilter]);
+  const periodInvoices = useMemo(() => (
+    monthFilter === 'all' ? invoices : invoices.filter((d) => getDocMonth(d) === monthFilter)
+  ), [invoices, monthFilter]);
+  const periodFacturas = useMemo(() => (
+    monthFilter === 'all' ? facturas : facturas.filter((d) => getDocMonth(d) === monthFilter)
+  ), [facturas, monthFilter]);
   const filtered = useMemo(() => list.filter((d) => {
+    if (monthFilter !== 'all' && getDocMonth(d) !== monthFilter) return false;
     if (statusFilter !== 'all' && d.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -156,23 +193,21 @@ export default function CobrosModule() {
       );
     }
     return true;
-  }), [list, search, statusFilter]);
+  }), [list, monthFilter, search, statusFilter]);
 
   // KPIs unificados (ambos tabs)
   const today     = new Date().toISOString().slice(0, 10);
-  const allDocs   = [...invoices, ...facturas];
-
-  const totalPaid     = allDocs.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
+  const totalPaid     = periodDocs.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
   // Enviadas con fecha de vence futura o sin fecha → por cobrar vigente
-  const totalPend     = allDocs.filter((d) => d.status === 'sent' && (!d.due_date || d.due_date >= today)).reduce((a, d) => a + Number(d.total || 0), 0);
+  const totalPend     = periodDocs.filter((d) => d.status === 'sent' && (!d.due_date || d.due_date >= today)).reduce((a, d) => a + Number(d.total || 0), 0);
   // Enviadas con fecha de vence pasada → cartera vencida
-  const totalOverdue  = allDocs.filter((d) => d.status === 'sent' && d.due_date && d.due_date < today).reduce((a, d) => a + Number(d.total || 0), 0);
+  const totalOverdue  = periodDocs.filter((d) => d.status === 'sent' && d.due_date && d.due_date < today).reduce((a, d) => a + Number(d.total || 0), 0);
   // Borradores sin enviar
-  const totalDraft    = allDocs.filter((d) => d.status === 'draft').reduce((a, d) => a + Number(d.total || 0), 0);
+  const totalDraft    = periodDocs.filter((d) => d.status === 'draft').reduce((a, d) => a + Number(d.total || 0), 0);
 
-  const tabPaid    = list.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
-  const tabPend    = list.filter((d) => d.status === 'sent' && (!d.due_date || d.due_date >= today)).reduce((a, d) => a + Number(d.total || 0), 0);
-  const tabOverdue = list.filter((d) => d.status === 'sent' && d.due_date && d.due_date < today).reduce((a, d) => a + Number(d.total || 0), 0);
+  const tabPaid    = periodList.filter((d) => d.status === 'paid').reduce((a, d) => a + Number(d.total || 0), 0);
+  const tabPend    = periodList.filter((d) => d.status === 'sent' && (!d.due_date || d.due_date >= today)).reduce((a, d) => a + Number(d.total || 0), 0);
+  const tabOverdue = periodList.filter((d) => d.status === 'sent' && d.due_date && d.due_date < today).reduce((a, d) => a + Number(d.total || 0), 0);
 
   const accentBtn = activeTab === 'invoices'
     ? 'from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 shadow-[0_4px_16px_rgba(16,185,129,0.3)]'
@@ -186,7 +221,7 @@ export default function CobrosModule() {
         <div>
           <h1 className="text-xl font-extrabold text-gray-900">Cobros</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {allDocs.length} documento{allDocs.length !== 1 ? 's' : ''} en total
+            {periodDocs.length} documento{periodDocs.length !== 1 ? 's' : ''} en {formatMonthLabel(monthFilter)}
           </p>
         </div>
         <Link
@@ -256,8 +291,8 @@ export default function CobrosModule() {
       {/* KPIs globales — fila 2: conteo de documentos */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         {[
-          { label: 'Cuentas de cobro', value: invoices.length, icon: '🧾', color: 'from-emerald-300 to-teal-400', valueColor: 'text-teal-700' },
-          { label: 'Facturas',         value: facturas.length, icon: '📑', color: 'from-violet-400 to-indigo-500', valueColor: 'text-violet-700' },
+          { label: 'Cuentas de cobro', value: periodInvoices.length, icon: '🧾', color: 'from-emerald-300 to-teal-400', valueColor: 'text-teal-700' },
+          { label: 'Facturas',         value: periodFacturas.length, icon: '📑', color: 'from-violet-400 to-indigo-500', valueColor: 'text-violet-700' },
         ].map((k) => (
           <div key={k.label} className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
             <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${k.color} flex items-center justify-center text-sm flex-shrink-0`}>
@@ -275,7 +310,7 @@ export default function CobrosModule() {
       <div className="flex gap-1 p-1 bg-gray-100 rounded-2xl mb-5 w-fit">
         {TABS.map((t) => {
           const isActive = t.id === activeTab;
-          const count    = t.id === 'invoices' ? invoices.length : facturas.length;
+          const count    = t.id === 'invoices' ? periodInvoices.length : periodFacturas.length;
           return (
             <button
               key={t.id}
@@ -329,6 +364,21 @@ export default function CobrosModule() {
 
       {/* Filtros */}
       <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="relative min-w-48">
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="w-full appearance-none pl-4 pr-9 py-2 text-sm rounded-xl border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+          >
+            <option value="all">Todos los meses</option>
+            {monthOptions.map((month) => (
+              <option key={month} value={month}>{formatMonthLabel(month)}</option>
+            ))}
+          </select>
+          <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
         <div className="relative flex-1 min-w-48">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -358,8 +408,8 @@ export default function CobrosModule() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 bg-white border border-dashed border-gray-200 rounded-2xl text-center">
           <span className="text-4xl mb-3">{tab.icon}</span>
-          <p className="text-gray-700 font-semibold">{search || statusFilter !== 'all' ? 'Sin resultados' : `Aún no hay ${tab.label.toLowerCase()}`}</p>
-          {!search && statusFilter === 'all' && (
+          <p className="text-gray-700 font-semibold">{search || statusFilter !== 'all' || monthFilter !== 'all' ? 'Sin resultados' : `Aún no hay ${tab.label.toLowerCase()}`}</p>
+          {!search && statusFilter === 'all' && monthFilter === 'all' && (
             <Link to={tab.newHref} className={`mt-4 text-sm font-medium ${activeTab === 'invoices' ? 'text-emerald-600 hover:text-emerald-700' : 'text-violet-600 hover:text-violet-700'}`}>
               + Crear el primero
             </Link>
