@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabaseAuxAuth } from '../../lib/supabase';
 import { superadminApi } from '../../api';
 import { queryKeys } from '../../lib/queryKeys';
+import { PLAN_MODULES } from '../../context/CompanyContext';
 
 const PLANS = ['free', 'pro', 'enterprise'];
 const PLAN_META = {
@@ -13,6 +14,17 @@ const PLAN_META = {
 const EMPTY      = { name: '', email: '', nit: '', phone: '', city: '', plan: 'free', is_active: true };
 const EMPTY_USER = { email: '', password: '', role: 'admin' };
 const PAGE_SIZE  = 15;
+const MODULES = [
+  { id: 'clientes', label: 'Clientes' },
+  { id: 'cobros', label: 'Cobros' },
+  { id: 'cotizaciones', label: 'Cotizaciones' },
+  { id: 'contratos', label: 'Contratos' },
+  { id: 'servicios', label: 'Servicios' },
+  { id: 'inventario', label: 'Inventario' },
+  { id: 'reminders', label: 'Recordatorios' },
+  { id: 'analytics', label: 'Analíticas' },
+  { id: 'facturacion', label: 'Facturación' },
+];
 
 function genPassword(len = 12) {
   const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$';
@@ -36,6 +48,10 @@ export default function SACompanies() {
   const [userError,    setUserError]    = useState('');
   const [userCreated,  setUserCreated]  = useState(null); // { email, password }
   const [showPwd,      setShowPwd]      = useState(false);
+  const [modulesModal, setModulesModal] = useState(null);
+  const [moduleDraft,  setModuleDraft]  = useState({});
+  const [modulesSaving, setModulesSaving] = useState(false);
+  const [modulesError, setModulesError] = useState('');
 
   const companiesQuery = useQuery({
     queryKey: queryKeys.superadmin.companies,
@@ -121,6 +137,33 @@ export default function SACompanies() {
 
   const handleChangePlan = async (id, plan) => {
     await companyMutation.mutateAsync({ action: 'update', id, payload: { plan, updated_at: new Date().toISOString() } });
+  };
+
+  const modulesForPlan = (planId) => PLAN_MODULES[planId] ?? PLAN_MODULES.free;
+  const moduleIsEnabled = (company, moduleId) => {
+    const override = company.module_overrides?.[moduleId];
+    return typeof override === 'boolean' ? override : modulesForPlan(company.plan ?? 'free').includes(moduleId);
+  };
+  const openModulesModal = (company) => {
+    setModulesError('');
+    setModuleDraft(Object.fromEntries(MODULES.map(({ id }) => [id, moduleIsEnabled(company, id)])));
+    setModulesModal(company);
+  };
+  const handleSaveModules = async () => {
+    setModulesSaving(true);
+    setModulesError('');
+    try {
+      const baseModules = modulesForPlan(modulesModal.plan ?? 'free');
+      const module_overrides = Object.fromEntries(MODULES
+        .filter(({ id }) => Boolean(moduleDraft[id]) !== baseModules.includes(id))
+        .map(({ id }) => [id, Boolean(moduleDraft[id])]));
+      await companyMutation.mutateAsync({ action: 'update', id: modulesModal.id, payload: { module_overrides, updated_at: new Date().toISOString() } });
+      setModulesModal(null);
+    } catch (error) {
+      setModulesError(error.message ?? 'No se pudieron guardar los módulos.');
+    } finally {
+      setModulesSaving(false);
+    }
   };
 
   const openUserModal = (company) => {
@@ -316,6 +359,10 @@ export default function SACompanies() {
                     <span className="text-[10px] text-gray-400 mr-1">
                       {c.created_at ? new Date(c.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
                     </span>
+                    <button onClick={() => openModulesModal(c)} title="Configurar módulos" aria-label={`Configurar módulos de ${c.name}`}
+                      className="w-7 h-7 rounded-lg bg-gray-100 text-gray-400 hover:bg-indigo-100 hover:text-indigo-700 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16M8 6v0m8 6v0m-5 6v0"/><circle cx="8" cy="6" r="2" fill="currentColor"/><circle cx="16" cy="12" r="2" fill="currentColor"/><circle cx="11" cy="18" r="2" fill="currentColor"/></svg>
+                    </button>
                     {/* Crear acceso */}
                     <button onClick={() => openUserModal(c)} title="Crear usuario para esta empresa"
                       className="w-7 h-7 rounded-lg bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-700 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
@@ -330,6 +377,9 @@ export default function SACompanies() {
 
                   {/* Mobile: acciones */}
                   <div className="col-span-2 md:hidden flex justify-end">
+                    <button onClick={() => openModulesModal(c)} title="Configurar módulos" aria-label={`Configurar módulos de ${c.name}`} className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mr-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2" fill="currentColor"/><circle cx="16" cy="12" r="2" fill="currentColor"/></svg>
+                    </button>
                     <button onClick={() => openEdit(c)} className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                     </button>
@@ -368,6 +418,42 @@ export default function SACompanies() {
           </div>
         )}
       </div>
+
+      {/* ── Modal módulos por empresa ── */}
+      {modulesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-extrabold text-gray-900">Módulos de la empresa</h2>
+                <p className="text-xs text-gray-500 mt-1">{modulesModal.name} · Plan {PLAN_META[modulesModal.plan ?? 'free']?.label}</p>
+              </div>
+              <button onClick={() => setModulesModal(null)} aria-label="Cerrar" className="text-gray-400 hover:text-gray-700 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-500 mb-4">Activa o desactiva las funciones disponibles para esta empresa.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {MODULES.map(({ id, label }) => (
+                  <label key={id} className={`flex items-center justify-between gap-3 p-3 rounded-xl border cursor-pointer transition ${moduleDraft[id] ? 'border-emerald-200 bg-emerald-50/70' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
+                    <span className="text-sm font-medium text-gray-700">{label}</span>
+                    <input type="checkbox" checked={Boolean(moduleDraft[id])} onChange={(e) => setModuleDraft((draft) => ({ ...draft, [id]: e.target.checked }))} className="w-4 h-4 rounded accent-emerald-600" />
+                  </label>
+                ))}
+              </div>
+              {modulesError && <p role="alert" className="mt-4 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">{modulesError}</p>}
+              <p className="text-[11px] text-gray-400 mt-4">Los cambios solo afectan a esta empresa. Los módulos sin personalización siguen el plan asignado.</p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setModulesModal(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition">Cancelar</button>
+              <button onClick={handleSaveModules} disabled={modulesSaving} className="px-4 py-2 text-sm font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition disabled:opacity-50">
+                {modulesSaving ? 'Guardando…' : 'Guardar módulos'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal crear usuario para empresa ── */}
       {userModal && (
@@ -454,7 +540,7 @@ export default function SACompanies() {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Rol en la empresa</label>
                   <div className="flex gap-2">
-                    {[['admin','Administrador','bg-yellow-50 border-yellow-300 text-yellow-700'],['user','Usuario','bg-indigo-50 border-indigo-300 text-indigo-700']].map(([val, lbl, cls]) => (
+                    {[['admin','Administrador','bg-yellow-50 border-yellow-300 text-yellow-700'],['user','Usuario','bg-indigo-50 border-indigo-300 text-indigo-700'],['superadmin','Super Admin','bg-violet-50 border-violet-300 text-violet-700']].map(([val, lbl, cls]) => (
                       <button key={val} onClick={() => setUserForm({ ...userForm, role: val })}
                         className={`flex-1 py-2 rounded-xl border-2 text-xs font-semibold transition ${userForm.role === val ? cls : 'border-gray-200 text-gray-400 bg-white hover:bg-gray-50'}`}>
                         {lbl}
