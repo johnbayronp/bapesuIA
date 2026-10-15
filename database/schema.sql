@@ -50,6 +50,28 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 
+-- Impide que un usuario distinto de un superadmin asigne ese rol, incluso
+-- si intenta saltarse los controles de la interfaz.
+CREATE OR REPLACE FUNCTION public.guard_superadmin_role()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+    IF NEW.role NOT IN ('admin', 'user', 'superadmin') THEN
+        RAISE EXCEPTION 'Rol no válido';
+    END IF;
+    IF NEW.role = 'superadmin'
+       AND auth.uid() IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'superadmin') THEN
+        RAISE EXCEPTION 'Solo un superadmin puede asignar el rol superadmin';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_guard_superadmin_role ON public.users;
+CREATE TRIGGER trg_guard_superadmin_role
+    BEFORE INSERT OR UPDATE OF role ON public.users
+    FOR EACH ROW EXECUTE FUNCTION public.guard_superadmin_role();
+
 -- ── Empresas ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.bapesu_companies (
     id           UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -74,6 +96,7 @@ CREATE TABLE IF NOT EXISTS public.bapesu_companies (
 
 -- Migración: columna de color de marca (idempotente)
 ALTER TABLE public.bapesu_companies ADD COLUMN IF NOT EXISTS brand_color TEXT DEFAULT '#0f172a';
+ALTER TABLE public.bapesu_companies ADD COLUMN IF NOT EXISTS module_overrides JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_bapesu_companies_created_by ON public.bapesu_companies(created_by);
 
@@ -139,6 +162,9 @@ BEGIN
     END IF;
     IF caller_company <> p_company_id THEN
         RAISE EXCEPTION 'No puedes asignar usuarios a otra empresa';
+    END IF;
+    IF p_role NOT IN ('admin', 'user') THEN
+        RAISE EXCEPTION 'Los administradores solo pueden asignar roles de administrador o usuario';
     END IF;
 
     INSERT INTO public.users (id, email, role, company_id, is_active, updated_at)
@@ -919,6 +945,9 @@ BEGIN
     SELECT role INTO caller_role FROM public.users WHERE id = auth.uid() LIMIT 1;
     IF caller_role <> 'superadmin' THEN
         RAISE EXCEPTION 'Solo el superadmin puede usar esta función';
+    END IF;
+    IF p_role NOT IN ('admin', 'user', 'superadmin') THEN
+        RAISE EXCEPTION 'Rol no válido';
     END IF;
 
     INSERT INTO public.users (id, email, role, company_id, is_active, updated_at)
