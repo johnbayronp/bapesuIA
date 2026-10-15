@@ -18,6 +18,11 @@ body {
   font-family: 'Poppins', sans-serif;
 }
 
+@page {
+  size: letter;
+  margin: 0;
+}
+
 /* ── Futuristic background grid ── */
 .bg-grid {
   background-image:

@@ -32,6 +32,9 @@ export default function UsersManager() {
   const [form, setForm]       = useState(EMPTY);
   const [showPwd, setShowPwd] = useState(false);
   const [createdInfo, setCreatedInfo] = useState(null); // muestra credenciales tras crear
+  const [roleChange, setRoleChange] = useState(null);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [roleError, setRoleError] = useState('');
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
@@ -87,6 +90,9 @@ export default function UsersManager() {
     if (form.confirmPassword && form.confirmPassword !== form.password) {
       setError('Las contraseñas no coinciden'); return;
     }
+    if (profile?.role !== 'superadmin' && form.role === 'superadmin') {
+      setError('Solo un Super Admin puede crear usuarios con ese rol'); return;
+    }
 
     if (!company?.id) { setError('No tienes una empresa asociada'); return; }
     if (!isAdmin)     { setError('Solo los administradores pueden crear usuarios'); return; }
@@ -114,10 +120,26 @@ export default function UsersManager() {
     setSaving(false);
   };
 
-  const handleToggleRole = async (u) => {
-    const newRole = u.role === 'admin' ? 'user' : 'admin';
-    if (!window.confirm(`¿Cambiar rol de ${u.email} a "${newRole}"?`)) return;
-    await updateUserMutation.mutateAsync({ id: u.id, payload: { role: newRole, updated_at: new Date().toISOString() } });
+  const handleToggleRole = (u) => {
+    setRoleError('');
+    setRoleChange({ user: u, role: u.role === 'admin' ? 'user' : 'admin' });
+  };
+
+  const confirmRoleChange = async () => {
+    if (!roleChange) return;
+    setRoleSaving(true);
+    setRoleError('');
+    try {
+      await updateUserMutation.mutateAsync({
+        id: roleChange.user.id,
+        payload: { role: roleChange.role, updated_at: new Date().toISOString() },
+      });
+      setRoleChange(null);
+    } catch (e) {
+      setRoleError(e.message ?? 'No se pudo cambiar el rol. Inténtalo de nuevo.');
+    } finally {
+      setRoleSaving(false);
+    }
   };
 
   const handleToggleActive = async (u) => {
@@ -259,6 +281,43 @@ export default function UsersManager() {
         </div>
       )}
 
+      {/* Confirmación para cambiar el rol */}
+      {roleChange && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="presentation">
+          <button type="button" aria-label="Cerrar" className="absolute inset-0 bg-gray-900/45 backdrop-blur-sm" onClick={() => !roleSaving && setRoleChange(null)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="role-change-title" className="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="h-1 w-full bg-gradient-to-r from-yellow-400 to-amber-500" />
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
+                <div className="min-w-0">
+                  <h2 id="role-change-title" className="text-base font-bold text-gray-900">Cambiar rol del usuario</h2>
+                  <p className="text-sm text-gray-500 mt-1">Confirma el nuevo nivel de acceso para esta cuenta.</p>
+                </div>
+              </div>
+              <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm font-semibold text-gray-800 break-all">{roleChange.user.email}</p>
+                <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
+                  <span>Nuevo rol</span>
+                  <span className={`inline-flex px-2 py-1 rounded-full font-semibold ${ROLE_LABELS[roleChange.role]?.bg} ${ROLE_LABELS[roleChange.role]?.color}`}>
+                    {ROLE_LABELS[roleChange.role]?.label ?? roleChange.role}
+                  </span>
+                </div>
+              </div>
+              {roleError && <p role="alert" className="mt-4 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">{roleError}</p>}
+              <div className="flex justify-end gap-2 mt-6">
+                <button type="button" disabled={roleSaving} onClick={() => setRoleChange(null)} className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50">Cancelar</button>
+                <button type="button" disabled={roleSaving} onClick={confirmRoleChange} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-900 text-sm font-semibold transition disabled:opacity-60">
+                  {roleSaving ? 'Guardando…' : 'Confirmar cambio'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL ── */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -350,7 +409,9 @@ export default function UsersManager() {
                   <div>
                     <label className={LABEL}>Rol</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(ROLE_LABELS).map(([key, val]) => (
+                      {Object.entries(ROLE_LABELS)
+                        .filter(([key]) => key !== 'superadmin' || profile?.role === 'superadmin')
+                        .map(([key, val]) => (
                         <button
                           key={key}
                           type="button"

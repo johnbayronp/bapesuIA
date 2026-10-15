@@ -10,6 +10,7 @@ import InventoryTestPanel from './sections/inventory/InventoryTestPanel';
 import CobrosModule from './sections/CobrosModule';
 import FacturaEditor from './sections/FacturaEditor';
 import QuotationsList from './sections/QuotationsList';
+import ContractsModule from './sections/ContractsModule';
 import QuotationEditor from './sections/QuotationEditor';
 import InvoiceEditor from './sections/InvoiceEditor';
 import LockedModule from './LockedModule';
@@ -36,6 +37,7 @@ const ROUTES = [
   { routePath: '/inv-test', test: (p) => p === '/inv-test' },
   { routePath: '/cobros', test: (p) => p === '/cobros' },
   { routePath: '/quotations', test: (p) => p === '/quotations' },
+  { routePath: '/contracts', test: (p) => p === '/contracts' },
   { routePath: '/users', test: (p) => p === '/users' },
   { routePath: '/company', test: (p) => p === '/company' },
 ];
@@ -68,6 +70,8 @@ export function renderDashboardPage(pathname, { canAccess, company }) {
       return canAccess('cobros') ? <CobrosModule /> : locked('Cobros');
     case '/quotations':
       return canAccess('cotizaciones') ? <QuotationsList /> : locked('Cotizaciones');
+    case '/contracts':
+      return canAccess('contratos') ? <ContractsModule /> : locked('Contratos');
     case '/users':
       return <UsersManager />;
     case '/company':

@@ -32,6 +32,7 @@ const NAV = [
   },
   {
     id: 'services',
+    module: 'servicios',
     label: 'Servicios',
     href: '/dashboard/services',
     icon: (
@@ -43,6 +44,7 @@ const NAV = [
   },
   {
     id: 'analytics',
+    module: 'analytics',
     label: 'Analíticas',
     href: '/dashboard/analytics',
     icon: (
@@ -54,6 +56,7 @@ const NAV = [
   },
   {
     id: 'reminders',
+    module: 'reminders',
     label: 'Recordatorios',
     href: '/dashboard/reminders',
     icon: (
@@ -105,6 +108,20 @@ const BIZ = [
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    ),
+  },
+  {
+    id: 'contracts',
+    module: 'contratos',
+    label: 'Contratos',
+    href: '/dashboard/contracts',
+    accent: 'text-blue-600',
+    activeBg: 'bg-blue-50 text-blue-700',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M9 13h6m-6 4h6" />
       </svg>
     ),
   },
@@ -207,19 +224,27 @@ export default function BusinessDashboard() {
         <p className="text-[10px] uppercase tracking-widest text-gray-400 px-3 mb-2">General</p>
         {NAV.map((item) => {
           const active = isActive(item.href, item.exact);
+          const allowed = !item.module || canAccess(item.module);
           return (
             <Link
               key={item.id}
               to={item.href}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                active
+                active && allowed
                   ? 'bg-yellow-50 text-yellow-600'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  : allowed
+                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    : 'text-gray-400 hover:bg-gray-50'
               }`}
             >
-              {item.icon}
-              {item.label}
+              <span className={!allowed ? 'text-gray-300' : ''}>{item.icon}</span>
+              <span className="flex-1">{item.label}</span>
+              {!allowed && (
+                <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 20 20" aria-label="Módulo deshabilitado">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+              )}
             </Link>
           );
         })}
@@ -234,10 +259,10 @@ export default function BusinessDashboard() {
               to={item.href}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                active ? item.activeBg : allowed ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' : 'text-gray-400 hover:bg-gray-50'
+                active && allowed ? item.activeBg : allowed ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' : 'text-gray-400 hover:bg-gray-50'
               }`}
             >
-              <span className={active ? '' : allowed ? item.accent : 'text-gray-300'}>{item.icon}</span>
+              <span className={active && allowed ? '' : allowed ? item.accent : 'text-gray-300'}>{item.icon}</span>
               <span className="flex-1">{item.label}</span>
               {!allowed && (
                 <svg className="w-3.5 h-3.5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">

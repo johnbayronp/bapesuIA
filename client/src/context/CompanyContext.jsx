@@ -4,9 +4,9 @@ import { db } from '../api/db';
 
 // ── Módulos por plan ──────────────────────────────────────────────────
 export const PLAN_MODULES = {
-  free:       ['clientes', 'cobros', 'cotizaciones'],
-  pro:        ['clientes', 'cobros', 'cotizaciones', 'servicios', 'inventario', 'reminders', 'analytics'],
-  enterprise: ['clientes', 'cobros', 'cotizaciones', 'servicios', 'inventario', 'reminders', 'analytics', 'facturacion'],
+  free:       ['clientes', 'cobros', 'cotizaciones', 'contratos'],
+  pro:        ['clientes', 'cobros', 'cotizaciones', 'contratos', 'servicios', 'inventario', 'reminders', 'analytics'],
+  enterprise: ['clientes', 'cobros', 'cotizaciones', 'contratos', 'servicios', 'inventario', 'reminders', 'analytics', 'facturacion'],
 };
 
 export const PLAN_LABELS = {
@@ -99,9 +99,11 @@ export function CompanyProvider({ children }) {
 
   const isSuperAdmin = profile?.role === 'superadmin';
 
-  // Devuelve true si el plan de la empresa incluye el módulo (o si es superadmin)
+  // Los overrides por empresa prevalecen; el resto de módulos sigue el plan.
   const canAccess = (moduleId) => {
     if (isSuperAdmin) return true;
+    const override = company?.module_overrides?.[moduleId];
+    if (typeof override === 'boolean') return override;
     const plan = company?.plan ?? 'free';
     const allowed = PLAN_MODULES[plan] ?? PLAN_MODULES.free;
     return allowed.includes(moduleId);

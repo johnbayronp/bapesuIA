@@ -8,6 +8,7 @@ const ALL_MODULES = [
   { id: 'clientes',    label: 'Clientes' },
   { id: 'cobros',      label: 'Cobros' },
   { id: 'cotizaciones',label: 'Cotizaciones' },
+  { id: 'contratos',    label: 'Contratos' },
   { id: 'servicios',   label: 'Servicios' },
   { id: 'inventario',  label: 'Inventario' },
   { id: 'reminders',   label: 'Recordatorios' },
