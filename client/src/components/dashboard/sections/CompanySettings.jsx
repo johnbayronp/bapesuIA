@@ -14,6 +14,8 @@ const EMPTY = {
   address: '', city: '',
   logo_url: '', payment_info: '',
   brand_color: '#0f172a',
+  uses_pos: false,
+  pos_business_type: 'retail',
 };
 
 const BRAND_PRESETS = [
@@ -101,6 +103,8 @@ export default function CompanySettings() {
           logo_url:     form.logo_url?.trim() || null,
           payment_info: form.payment_info?.trim() || null,
           brand_color:  form.brand_color || '#0f172a',
+          uses_pos:     Boolean(form.uses_pos),
+          pos_business_type: form.uses_pos ? (form.pos_business_type || 'retail') : 'retail',
         });
 
       setSavedAt(new Date());
@@ -324,6 +328,77 @@ export default function CompanySettings() {
           disabled={!isAdmin}
           placeholder="Bancolombia • Ahorros • 123-456-789-00"
         />
+      </div>
+
+      {/* Card: POS */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-5 shadow-sm">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Ventas POS</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Define si esta empresa vende por punto de venta y que experiencia debe mostrar.
+            </p>
+          </div>
+          <label className={`relative inline-flex items-center cursor-pointer ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={Boolean(form.uses_pos)}
+              disabled={!isAdmin}
+              onChange={(e) => setF('uses_pos', e.target.checked)}
+            />
+            <span className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow after:transition-all peer-checked:after:translate-x-5" />
+            <span className="ml-3 text-sm font-semibold text-gray-700">
+              {form.uses_pos ? 'POS activo' : 'POS inactivo'}
+            </span>
+          </label>
+        </div>
+
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${!form.uses_pos ? 'opacity-50' : ''}`}>
+          {[
+            {
+              id: 'retail',
+              title: 'Local comercial',
+              text: 'Ventas rapidas de mostrador con inventario y recibo.',
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7h18M5 7v10a2 2 0 002 2h10a2 2 0 002-2V7M8 11h.01M12 11h4M8 15h.01M12 15h4" />
+                </svg>
+              ),
+            },
+            {
+              id: 'restaurant',
+              title: 'Restaurante',
+              text: 'Ventas de mostrador y cuentas por mesa para servicio en sala.',
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 10h16M6 10v8m12-8v8M8 6h8a2 2 0 012 2v2H6V8a2 2 0 012-2zm-2 12h12M9 14h6" />
+                </svg>
+              ),
+            },
+          ].map((option) => {
+            const active = form.pos_business_type === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={!isAdmin || !form.uses_pos}
+                onClick={() => setF('pos_business_type', option.id)}
+                className={`text-left rounded-xl border-2 p-4 transition ${
+                  active
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                } disabled:cursor-not-allowed`}
+              >
+                <span className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {option.icon}
+                </span>
+                <span className="block text-sm font-extrabold text-gray-900">{option.title}</span>
+                <span className="block text-xs text-gray-500 mt-1 leading-relaxed">{option.text}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Card: apariencia */}

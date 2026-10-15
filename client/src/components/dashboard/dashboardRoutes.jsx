@@ -7,6 +7,7 @@ import Analytics from './sections/Analytics';
 import Reminders from './sections/Reminders';
 import InventoryModule from './sections/inventory';
 import InventoryTestPanel from './sections/inventory/InventoryTestPanel';
+import POSModule from './sections/POSModule';
 import CobrosModule from './sections/CobrosModule';
 import FacturaEditor from './sections/FacturaEditor';
 import QuotationsList from './sections/QuotationsList';
@@ -33,6 +34,7 @@ const ROUTES = [
   { routePath: '/analytics', test: (p) => p === '/analytics' },
   { routePath: '/reminders', test: (p) => p === '/reminders' },
   { routePath: '/inventory', test: (p) => p === '/inventory' },
+  { routePath: '/pos', test: (p) => p === '/pos' },
   { routePath: '/inv-test', test: (p) => p === '/inv-test' },
   { routePath: '/cobros', test: (p) => p === '/cobros' },
   { routePath: '/quotations', test: (p) => p === '/quotations' },
@@ -62,6 +64,8 @@ export function renderDashboardPage(pathname, { canAccess, company }) {
       return canAccess('reminders') ? <Reminders /> : locked('Recordatorios');
     case '/inventory':
       return canAccess('inventario') ? <InventoryModule /> : locked('Inventario');
+    case '/pos':
+      return canAccess('inventario') ? <POSModule /> : locked('Ventas POS');
     case '/inv-test':
       return <InventoryTestPanel />;
     case '/cobros':

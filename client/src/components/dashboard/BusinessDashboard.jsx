@@ -81,6 +81,20 @@ const BIZ = [
     ),
   },
   {
+    id: 'pos',
+    module: 'inventario',
+    label: 'Ventas POS',
+    href: '/dashboard/pos',
+    accent: 'text-emerald-600',
+    activeBg: 'bg-emerald-50 text-emerald-700',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M3 7h18M5 7v10a2 2 0 002 2h10a2 2 0 002-2V7M8 11h.01M12 11h4M8 15h.01M12 15h4M8 3h8a2 2 0 012 2v2H6V5a2 2 0 012-2z" />
+      </svg>
+    ),
+  },
+  {
     id: 'cobros',
     module: 'cobros',
     label: 'Cobros',
