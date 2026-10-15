@@ -4,9 +4,9 @@ import { db } from '../api/db';
 
 // ── Módulos por plan ──────────────────────────────────────────────────
 export const PLAN_MODULES = {
-  free:       ['clientes', 'cobros', 'cotizaciones'],
-  pro:        ['clientes', 'cobros', 'cotizaciones', 'servicios', 'inventario', 'reminders', 'analytics'],
-  enterprise: ['clientes', 'cobros', 'cotizaciones', 'servicios', 'inventario', 'reminders', 'analytics', 'facturacion'],
+  free:       ['clientes', 'cobros', 'cotizaciones', 'contratos'],
+  pro:        ['clientes', 'cobros', 'cotizaciones', 'contratos', 'servicios', 'inventario', 'reminders', 'analytics'],
+  enterprise: ['clientes', 'cobros', 'cotizaciones', 'contratos', 'servicios', 'inventario', 'reminders', 'analytics', 'facturacion'],
 };
 
 export const PLAN_LABELS = {

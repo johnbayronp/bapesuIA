@@ -108,6 +108,20 @@ const BIZ = [
       </svg>
     ),
   },
+  {
+    id: 'contracts',
+    module: 'contratos',
+    label: 'Contratos',
+    href: '/dashboard/contracts',
+    accent: 'text-blue-600',
+    activeBg: 'bg-blue-50 text-blue-700',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M9 13h6m-6 4h6" />
+      </svg>
+    ),
+  },
 ];
 
 const ADMIN = [
