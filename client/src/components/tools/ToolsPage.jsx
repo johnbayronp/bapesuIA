@@ -5,6 +5,19 @@ import AdBanner from '../adsence/AdBanner';
 
 const tools = [
   {
+    title: 'Calculadora de Impresión 3D',
+    description: 'Calcula material, electricidad, tiempo de máquina y mano de obra. Define tu margen y obtén un precio de venta en COP.',
+    to: '/tools/3d-print-calculator',
+    gradient: 'from-violet-500 to-cyan-500',
+    glow: 'rgba(139,92,246,0.3)',
+    iconBg: 'bg-violet-500/10 dark:bg-violet-500/15',
+    iconColor: 'text-violet-500 dark:text-violet-400',
+    border: 'hover:border-violet-500/40',
+    badge: 'Nuevo',
+    badgeColor: 'bg-violet-500/15 text-violet-500 border border-violet-500/25',
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10v9M3 8l9 5 9-5M7.5 5.5l9 5v4" /></svg>,
+  },
+  {
     title: 'Quitar Fondo',
     description: 'Elimina el fondo de cualquier imagen con IA directamente en tu navegador. Sin subir datos a ningún servidor.',
     to: '/tools/remove-background',
