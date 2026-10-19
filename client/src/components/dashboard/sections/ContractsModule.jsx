@@ -6,9 +6,11 @@ import { generateContractDocx } from '../../../lib/contracts/contractDocx';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const DOCUMENT_TYPES = ['C.C.', 'T.I.', 'C.E.', 'P.P.T.', 'Pasaporte', 'Registro civil', 'NIT'];
+const MARITAL_STATUSES = ['Soltero(a)', 'Casado(a)', 'Unión libre', 'Divorciado(a)', 'Viudo(a)', 'Separado(a)'];
 const DEFAULT_FORM = () => ({
   buyerName: '', buyerIdType: 'C.C.', buyerIdentification: '', buyerIssuedIn: '', buyerMaritalStatus: '', buyerAddress: '', buyerPhone: '', buyerEmail: '',
-  coBuyerName: '', coBuyerIdType: 'C.C.', coBuyerIdentification: '', coBuyerIssuedIn: '', lot: '', areaM2: '', price: '', priceInWords: '',
+  coBuyerName: '', coBuyerIdType: 'C.C.', coBuyerIdentification: '', coBuyerIssuedIn: '', coBuyerMaritalStatus: '', coBuyerAddress: '', coBuyerPhone: '', coBuyerEmail: '', lot: '', areaM2: '', price: '', priceInWords: '',
   paymentStartDay: '15', paymentDeadlineDay: '20', initialPayment: '', monthlyInstallmentCount: '', monthlyInstallment: '',
   semiannualInstallmentCount: '', semiannualMonths: 'marzo y septiembre', semiannualInstallment: '', extraordinaryPayment: '', finalPayment: '',
   signingDate: new Date().toISOString().slice(0, 10), signingCity: 'Yopal, Casanare',
@@ -66,7 +68,8 @@ function contractToForm(contract) {
     buyerIssuedIn: buyer.issuedIn || '', buyerMaritalStatus: buyer.maritalStatus || '', buyerAddress: buyer.address || '',
     buyerPhone: buyer.phone || '', buyerEmail: buyer.email || '', coBuyerName: coBuyer.name || contract.co_buyer_name || '',
     coBuyerIdType: coBuyer.idType || 'C.C.', coBuyerIdentification: coBuyer.identification || contract.co_buyer_identification || '',
-    coBuyerIssuedIn: coBuyer.issuedIn || '',
+    coBuyerIssuedIn: coBuyer.issuedIn || '', coBuyerMaritalStatus: coBuyer.maritalStatus || '',
+    coBuyerAddress: coBuyer.address || '', coBuyerPhone: coBuyer.phone || '', coBuyerEmail: coBuyer.email || '',
     lot: contract.lot || '', areaM2: String(contract.area_m2 ?? ''), price: String(Math.trunc(Number(contract.price) || 0)), priceInWords: contract.price_in_words || '',
     paymentStartDay: String(contract.payment_start_day ?? 15), paymentDeadlineDay: String(contract.payment_deadline_day ?? 20),
     initialPayment: String(Math.trunc(Number(contract.initial_payment) || 0)), monthlyInstallmentCount: String(contract.monthly_installment_count ?? ''),
@@ -191,7 +194,8 @@ export default function ContractsModule() {
         phone: form.buyerPhone.trim(), email: form.buyerEmail.trim(),
         coBuyer: form.coBuyerName.trim() ? {
           name: form.coBuyerName.trim(), idType: form.coBuyerIdType.trim(), identification: form.coBuyerIdentification.trim(),
-          issuedIn: form.coBuyerIssuedIn.trim(),
+          issuedIn: form.coBuyerIssuedIn.trim(), maritalStatus: form.coBuyerMaritalStatus.trim(),
+          address: form.coBuyerAddress.trim(), phone: form.coBuyerPhone.trim(), email: form.coBuyerEmail.trim(),
         } : null,
       };
       const existingClient = await db.from('bapesu_clients').select('id').eq('company_id', company.id)
@@ -343,19 +347,23 @@ export default function ContractsModule() {
             <FieldGroup title="Datos del comprador">
               <Field label="Nombre completo" value={form.buyerName} onChange={(value) => setField('buyerName', value)} required />
               <div className="grid grid-cols-[minmax(100px,0.4fr)_1fr] gap-3">
-                <Field label="Tipo de documento" value={form.buyerIdType} onChange={(value) => setField('buyerIdType', value)} required placeholder="C.C." />
+                <SelectField label="Tipo de documento" value={form.buyerIdType} onChange={(value) => setField('buyerIdType', value)} options={DOCUMENT_TYPES} required />
                 <Field label="Número de documento" value={form.buyerIdentification} onChange={(value) => setField('buyerIdentification', value)} required />
               </div>
               <Field label="Documento expedido en" value={form.buyerIssuedIn} onChange={(value) => setField('buyerIssuedIn', value)} required />
-              <Field label="Estado civil" value={form.buyerMaritalStatus} onChange={(value) => setField('buyerMaritalStatus', value)} required />
+              <SelectField label="Estado civil" value={form.buyerMaritalStatus} onChange={(value) => setField('buyerMaritalStatus', value)} options={MARITAL_STATUSES} required />
               <Field label="Dirección" value={form.buyerAddress} onChange={(value) => setField('buyerAddress', value)} required />
               <Field label="Teléfono" type="tel" value={form.buyerPhone} onChange={(value) => setField('buyerPhone', value)} required />
               <Field label="Correo electrónico" type="email" value={form.buyerEmail} onChange={(value) => setField('buyerEmail', value)} required />
               <Field label="Segundo comprador (opcional)" value={form.coBuyerName} onChange={(value) => setField('coBuyerName', value)} />
               {form.coBuyerName.trim() && <>
-                <Field label="Tipo de documento del segundo comprador" value={form.coBuyerIdType} onChange={(value) => setField('coBuyerIdType', value)} required placeholder="C.C." />
+                <SelectField label="Tipo de documento del segundo comprador" value={form.coBuyerIdType} onChange={(value) => setField('coBuyerIdType', value)} options={DOCUMENT_TYPES} required />
                 <Field label="Número de documento del segundo comprador" value={form.coBuyerIdentification} onChange={(value) => setField('coBuyerIdentification', value)} required />
                 <Field label="Documento expedido en (segundo comprador)" value={form.coBuyerIssuedIn} onChange={(value) => setField('coBuyerIssuedIn', value)} required />
+                <SelectField label="Estado civil (segundo comprador)" value={form.coBuyerMaritalStatus} onChange={(value) => setField('coBuyerMaritalStatus', value)} options={MARITAL_STATUSES} required />
+                <Field label="Dirección (segundo comprador)" value={form.coBuyerAddress} onChange={(value) => setField('coBuyerAddress', value)} required />
+                <Field label="Teléfono (segundo comprador)" type="tel" value={form.coBuyerPhone} onChange={(value) => setField('coBuyerPhone', value)} required />
+                <Field label="Correo electrónico (segundo comprador)" type="email" value={form.coBuyerEmail} onChange={(value) => setField('coBuyerEmail', value)} required />
               </>}
             </FieldGroup>
 
@@ -445,6 +453,18 @@ function Field({ label, value, onChange, type = 'text', required = false, placeh
   return <label htmlFor={id} className="block min-w-0 space-y-1.5">
     <span className="text-xs font-semibold text-gray-600">{label}{required ? ' *' : ''}</span>
     <input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} required={required} readOnly={readOnly} placeholder={placeholder} min={type === 'number' ? '0' : undefined} step={type === 'number' ? '0.01' : undefined} className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 ${readOnly ? 'cursor-default bg-gray-50' : 'bg-white'}`} />
+  </label>;
+}
+
+function SelectField({ label, value, onChange, options, required = false }) {
+  const id = `contract-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const availableOptions = value && !options.includes(value) ? [value, ...options] : options;
+  return <label htmlFor={id} className="block min-w-0 space-y-1.5">
+    <span className="text-xs font-semibold text-gray-600">{label}{required ? ' *' : ''}</span>
+    <select id={id} value={value} onChange={(event) => onChange(event.target.value)} required={required} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20">
+      {!value && <option value="" disabled>Selecciona una opción</option>}
+      {availableOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
   </label>;
 }
 
