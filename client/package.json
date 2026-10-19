@@ -25,6 +25,7 @@
     "docx-preview": "0.4.1",
     "docxtemplater": "3.71.0",
     "jszip": "^3.10.1",
+    "pdfjs-dist": "^6.4.299",
     "pizzip": "3.3.0",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",

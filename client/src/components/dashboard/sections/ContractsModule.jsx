@@ -4,10 +4,22 @@ import { db } from '../../../api/db';
 import { useCompany } from '../../../context/CompanyContext';
 import { generateContractDocx } from '../../../lib/contracts/contractDocx';
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
-const ACCEPTED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const MAX_SOURCE_FILE_SIZE = 25 * 1024 * 1024;
 const DOCUMENT_TYPES = ['C.C.', 'T.I.', 'C.E.', 'P.P.T.', 'Pasaporte', 'Registro civil', 'NIT'];
 const MARITAL_STATUSES = ['Soltero(a)', 'Casado(a)', 'Unión libre', 'Divorciado(a)', 'Viudo(a)', 'Separado(a)'];
+
+async function attachmentKind(file) {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+  if (type === 'image/jpeg' || type === 'image/png' || /\.(jpe?g|png)$/.test(name)) return 'image';
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  if (String.fromCharCode(...bytes.slice(0, 5)) === '%PDF-') return 'pdf';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image';
+  return null;
+}
+
 const DEFAULT_FORM = () => ({
   buyerName: '', buyerIdType: 'C.C.', buyerIdentification: '', buyerIssuedIn: '', buyerMaritalStatus: '', buyerAddress: '', buyerPhone: '', buyerEmail: '',
   coBuyerName: '', coBuyerIdType: 'C.C.', coBuyerIdentification: '', coBuyerIssuedIn: '', coBuyerMaritalStatus: '', coBuyerAddress: '', coBuyerPhone: '', coBuyerEmail: '', lot: '', areaM2: '', price: '', priceInWords: '',
@@ -91,6 +103,7 @@ function saveBlob(blob, fileName) {
 
 export default function ContractsModule() {
   const { company, user } = useCompany();
+  const pendingStorageKey = company?.id ? `bapesu-contract-pending-${company.id}` : null;
   const [contracts, setContracts] = useState([]);
   const [view, setView] = useState('editor');
   const [form, setForm] = useState(DEFAULT_FORM);
@@ -99,6 +112,10 @@ export default function ContractsModule() {
   const [paymentPlanFile, setPaymentPlanFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pendingContractId, setPendingContractId] = useState(() => pendingStorageKey ? sessionStorage.getItem(pendingStorageKey) : null);
+  const [actionReason, setActionReason] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteReason, setDeleteReason] = useState('');
   const [workingId, setWorkingId] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -121,6 +138,10 @@ export default function ContractsModule() {
   }
 
   useEffect(() => { void refreshContracts(); }, [company?.id]);
+
+  useEffect(() => {
+    setPendingContractId(pendingStorageKey ? sessionStorage.getItem(pendingStorageKey) : null);
+  }, [pendingStorageKey]);
 
   useEffect(() => {
     const sequence = ++previewSequence.current;
@@ -171,8 +192,9 @@ export default function ContractsModule() {
   async function validateFile(file, label, { required = true, imageOnly = false } = {}) {
     if (!file && required) throw new Error(`Adjunta ${label.toLowerCase()} para guardar el contrato.`);
     if (!file) return;
-    if (file.size > MAX_FILE_SIZE) throw new Error(`${label}: el archivo no puede superar 2 MB.`);
-    if (imageOnly ? !['image/jpeg', 'image/png'].includes(file.type) : !ACCEPTED_TYPES.has(file.type)) {
+    if (file.size > MAX_SOURCE_FILE_SIZE) throw new Error(`${label}: el archivo original no puede superar 25 MB.`);
+    const kind = await attachmentKind(file);
+    if (imageOnly ? kind !== 'image' : !kind) {
       throw new Error(`${label}: ${imageOnly ? 'adjunta una imagen JPG o PNG.' : 'adjunta un PDF, JPG o PNG.'}`);
     }
   }
@@ -223,27 +245,96 @@ export default function ContractsModule() {
         semiannual_months: form.semiannualMonths.trim(), semiannual_installment: Number(form.semiannualInstallment),
         extraordinary_payment: form.extraordinaryPayment ? Number(form.extraordinaryPayment) : null,
         final_payment: Number(form.finalPayment), signing_date: form.signingDate, signing_city: form.signingCity.trim(),
-        status: 'DRAFT', created_by: user.id,
+        status: 'DRAFT', created_by: user.id, audit_reason: actionReason.trim() || null,
       };
-      const contractResponse = await contractsApi.create(payload);
-      if (contractResponse.error) throw contractResponse.error;
-      createdContractId = contractResponse.data.id;
+      let shouldUpdateExisting = Boolean(pendingContractId);
+      if (pendingContractId) createdContractId = pendingContractId;
+      else {
+        // Recover a recent draft from the old flow, which saved the contract row
+        // before attachment metadata failed and did not remember its id.
+        const recentContracts = await contractsApi.list(company.id);
+        if (recentContracts.error) throw recentContracts.error;
+        const recentIncomplete = (recentContracts.data || []).find((contract) => {
+          const age = Date.now() - new Date(contract.created_at).getTime();
+          const attachedKinds = new Set((contract.bapesu_contract_attachments || []).map((attachment) => attachment.kind));
+          return contract.status === 'DRAFT' && contract.created_by === user.id && age >= 0 && age < 24 * 60 * 60 * 1000
+            && contract.client_identification === payload.client_identification
+            && contract.co_buyer_identification === payload.co_buyer_identification
+            && contract.lot === payload.lot && Number(contract.price) === payload.price
+            && contract.signing_date === payload.signing_date
+            && (!attachedKinds.has('LOT_MAP') || !attachedKinds.has('BUYER_ID'));
+        });
+        if (recentIncomplete) {
+          createdContractId = recentIncomplete.id;
+          shouldUpdateExisting = true;
+        }
+      }
+
+      if (!createdContractId) {
+        const contractResponse = await contractsApi.create(payload);
+        if (contractResponse.error) throw contractResponse.error;
+        createdContractId = contractResponse.data.id;
+      } else if (shouldUpdateExisting) {
+        const contractResponse = await contractsApi.updateDraft(company.id, createdContractId, payload);
+        if (contractResponse.error) throw contractResponse.error;
+      }
+      setPendingContractId(createdContractId);
+      if (pendingStorageKey) sessionStorage.setItem(pendingStorageKey, createdContractId);
+
+      const existingKindsResponse = await contractsApi.listAttachmentKinds(company.id, createdContractId);
+      if (existingKindsResponse.error) throw existingKindsResponse.error;
+      const existingKinds = new Set((existingKindsResponse.data || []).map((attachment) => attachment.kind));
       for (const [kind, file] of [['LOT_MAP', mapFile], ['BUYER_ID', idFile], ['PAYMENT_PLAN', paymentPlanFile]]) {
-        if (!file) continue;
-        const upload = await contractsApi.uploadAttachment({ companyId: company.id, contractId: createdContractId, kind, file });
-        if (upload.error) throw upload.error;
+        if (!file || existingKinds.has(kind)) continue;
+        try {
+          const upload = await contractsApi.uploadAttachment({ companyId: company.id, contractId: createdContractId, kind, file });
+          if (upload.error) throw upload.error;
+        } catch (cause) {
+          const details = cause?.message || (typeof cause === 'string' ? cause : 'revisa la conexión con AWS y los permisos del bucket');
+          throw new Error(`No se pudo guardar el anexo “${file.name}”: ${details}`);
+        }
       }
       await refreshContracts();
+      setPendingContractId(null);
+      if (pendingStorageKey) sessionStorage.removeItem(pendingStorageKey);
       setForm(DEFAULT_FORM());
       setMapFile(null);
       setIdFile(null);
       setPaymentPlanFile(null);
+      setActionReason('');
       setNotice('Contrato guardado. Puedes descargarlo en formato Word desde la lista.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo guardar el contrato.');
-      if (createdContractId) setError((current) => `${current} El registro quedó guardado; revisa los anexos antes de descargar el Word.`);
+      const message = cause?.message || (typeof cause === 'string' ? cause : 'No se pudo guardar el contrato.');
+      setError(createdContractId
+        ? `${message} El registro del contrato quedó guardado; revisa el anexo indicado antes de descargar el Word.`
+        : message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function removeContract() {
+    if (!deleteTarget || deleteReason.trim().length < 5) return;
+    setWorkingId(deleteTarget.id);
+    setError('');
+    setNotice('');
+    try {
+      const response = await contractsApi.deleteWithAudit({
+        companyId: company.id,
+        contractId: deleteTarget.id,
+        reason: deleteReason.trim(),
+      });
+      if (response.error) throw response.error;
+      setDeleteTarget(null);
+      setDeleteReason('');
+      await refreshContracts();
+      setNotice(response.filesRemoved
+        ? 'Contrato eliminado. El usuario, la fecha, la hora y el motivo quedaron registrados en Trazabilidad.'
+        : 'Contrato eliminado y registrado en Trazabilidad, pero AWS no pudo borrar uno o más archivos anexos.');
+    } catch (cause) {
+      setError(cause?.message || 'No se pudo eliminar el contrato.');
+    } finally {
+      setWorkingId(null);
     }
   }
 
@@ -308,11 +399,14 @@ export default function ContractsModule() {
         </button>
       </header>
 
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
+
       {view === 'saved' ? (
         <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-5 py-4">
             <h2 className="font-bold text-gray-900">Contratos guardados</h2>
-            <p className="mt-1 text-sm text-gray-500">Abre un contrato para ver su documento completo o descargarlo en Word.</p>
+            <p className="mt-1 text-sm text-gray-500">Abre, descarga o elimina contratos. Las acciones de creación y eliminación quedan en Trazabilidad.</p>
           </div>
           {loading ? <p className="px-5 py-10 text-sm text-gray-500">Cargando contratos…</p> : contracts.length === 0 ? (
             <p className="px-5 py-10 text-sm text-gray-500">Los contratos creados aparecerán aquí.</p>
@@ -328,15 +422,13 @@ export default function ContractsModule() {
                 <div className="mt-auto flex flex-wrap gap-2">
                   <button type="button" onClick={async () => { setView('editor'); await loadSavedContract(contract); }} disabled={Boolean(workingId)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{workingId === contract.id ? 'Cargando…' : 'Abrir contrato'}</button>
                   <button type="button" onClick={() => void downloadWord(contract)} disabled={Boolean(workingId)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Descargar Word</button>
+                  <button type="button" onClick={() => { setDeleteTarget(contract); setDeleteReason(''); setError(''); setNotice(''); }} disabled={Boolean(workingId)} aria-label={`Eliminar contrato de ${contract.client_name}`} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Eliminar</button>
                 </div>
               </article>
             ))}
           </div>}
         </section>
       ) : <>
-      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
-
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <section className="min-w-0 bg-white rounded-2xl border border-gray-200 shadow-sm">
           <div className="px-5 py-4 border-b border-gray-100">
@@ -387,17 +479,23 @@ export default function ContractsModule() {
               <MoneyField label="Pago final (COP)" value={form.finalPayment} onChange={(value) => setMoneyField('finalPayment', value)} required />
             </FieldGroup>
 
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-gray-600">Motivo de creación (opcional)</span>
+              <textarea value={actionReason} onChange={(event) => setActionReason(event.target.value)} maxLength={1000} rows={2} placeholder="Ej.: formalización de compraventa del lote…" className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20" />
+              <span className="block text-[11px] text-gray-400">Quedará asociado al registro de trazabilidad.</span>
+            </label>
+
             <FieldGroup title="Firma y anexos">
               <Field label="Fecha del contrato" type="date" value={form.signingDate} onChange={(value) => setField('signingDate', value)} required />
               <Field label="Ciudad de firma" value={form.signingCity} onChange={(value) => setField('signingCity', value)} required />
-              <FileField label="Plano con lote señalado" file={mapFile} onChange={setMapFile} />
-              <FileField label="Cédula del comprador" file={idFile} onChange={setIdFile} />
-              <FileField label="Cuadro del plan de pagos (opcional)" file={paymentPlanFile} onChange={setPaymentPlanFile} required={false} accept="image/png,image/jpeg" />
-              <p className="text-xs text-gray-500">Adjuntos hasta 2 MB. Para el cuadro de pagos, importa una imagen JPG o PNG; si no la cargas, se genera automáticamente.</p>
+              <FileField label="Plano con lote señalado" file={mapFile} onChange={setMapFile} hint="PDF, JPG o PNG · hasta 25 MB antes de optimizar" />
+              <FileField label="Cédula del comprador" file={idFile} onChange={setIdFile} hint="PDF, JPG o PNG · hasta 25 MB antes de optimizar" />
+              <FileField label="Cuadro del plan de pagos (opcional)" file={paymentPlanFile} onChange={setPaymentPlanFile} required={false} accept=".jpg,.jpeg,.png,image/jpeg,image/png" hint="Solo JPG o PNG · hasta 25 MB antes de optimizar" />
+              <p className="text-xs text-gray-500">Los adjuntos de más de 2 MB se optimizan antes de subirlos a AWS. Para el cuadro de pagos, importa una imagen JPG o PNG; si no la cargas, se genera automáticamente.</p>
             </FieldGroup>
 
             <button type="submit" disabled={saving || loading} className="w-full rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-4 py-3 text-sm font-bold text-gray-900 shadow-[0_4px_16px_rgba(245,158,11,0.25)] transition hover:from-yellow-500 hover:to-amber-600 disabled:cursor-not-allowed disabled:opacity-60">
-              {saving ? 'Guardando contrato y anexos…' : 'Guardar contrato'}
+              {saving ? 'Guardando contrato y anexos…' : pendingContractId ? 'Reintentar anexos' : 'Guardar contrato'}
             </button>
           </form>
         </section>
@@ -423,6 +521,27 @@ export default function ContractsModule() {
         </div>
       </div>
       </>}
+
+      {deleteTarget && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-900/50 p-4 backdrop-blur-sm" role="presentation">
+        <section role="dialog" aria-modal="true" aria-labelledby="delete-contract-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl">
+          <div className="border-t-4 border-red-500 px-6 pb-5 pt-5">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 id="delete-contract-title" className="text-lg font-bold text-gray-900">Eliminar contrato</h2><p className="mt-1 text-sm text-gray-500">{deleteTarget.client_name} · Lote {deleteTarget.lot}</p></div>
+              <button type="button" onClick={() => setDeleteTarget(null)} disabled={Boolean(workingId)} aria-label="Cerrar" className="text-2xl leading-none text-gray-400 hover:text-gray-700">×</button>
+            </div>
+            <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">El contrato y sus anexos dejarán de estar disponibles. La eliminación quedará registrada en Trazabilidad.</p>
+            <label className="mt-4 block space-y-1.5">
+              <span className="text-xs font-semibold text-gray-700">Motivo de eliminación *</span>
+              <textarea autoFocus value={deleteReason} onChange={(event) => setDeleteReason(event.target.value)} maxLength={1000} minLength={5} rows={3} required placeholder="Escribe por qué se elimina este contrato…" className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-400/20" />
+              <span className="block text-[11px] text-gray-400">Mínimo 5 caracteres. Se guardará junto con tu usuario y la fecha y hora.</span>
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} disabled={Boolean(workingId)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+              <button type="button" onClick={() => void removeContract()} disabled={Boolean(workingId) || deleteReason.trim().length < 5} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">{workingId === deleteTarget.id ? 'Eliminando…' : 'Eliminar y registrar'}</button>
+            </div>
+          </div>
+        </section>
+      </div>}
 
       <style>{`
         .contract-docx-paper .docx-wrapper { background: #e2e8f0; padding: .75rem 0; }
@@ -476,11 +595,12 @@ function MoneyField({ label, value, onChange, required = false }) {
   </label>;
 }
 
-function FileField({ label, file, onChange, required = true, accept = 'application/pdf,image/png,image/jpeg' }) {
+function FileField({ label, file, onChange, required = true, accept = '.pdf,.jpg,.jpeg,.png,application/pdf,image/png,image/jpeg', hint = 'PDF, JPG o PNG · máximo 2 MB' }) {
   const id = `contract-file-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return <label htmlFor={id} className="block min-w-0 space-y-1.5">
     <span className="text-xs font-semibold text-gray-600">{label}{required ? ' *' : ''}</span>
     <input id={id} type="file" accept={accept} required={required} onChange={(event) => onChange(event.target.files?.[0] || null)} className="w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-700" />
-    <span className="block truncate text-[11px] text-gray-400">{file?.name || 'PDF, JPG o PNG · máximo 2 MB'}</span>
+    <span className="block truncate text-[11px] text-gray-400">{file?.name || 'Sin archivos seleccionados'}</span>
+    <span className="block text-[11px] text-gray-400">{hint}</span>
   </label>;
 }
