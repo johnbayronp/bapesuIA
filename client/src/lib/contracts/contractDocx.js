@@ -25,6 +25,48 @@ function boldPlaceholderWithoutHighlight(zip, placeholder) {
   zip.file('word/document.xml', `${xml.slice(0, runStart)}${run}${xml.slice(runEnd)}`);
 }
 
+function separateBuyerContactPlaceholders(zip) {
+  let xml = zip.file('word/document.xml').asText();
+  for (const field of ['BUYER_ADDRESS', 'BUYER_PHONE', 'BUYER_EMAIL']) {
+    const token = `{{${field}}}`;
+    const first = xml.indexOf(token);
+    const second = first < 0 ? -1 : xml.indexOf(token, first + token.length);
+    if (second < 0) continue;
+    const noticeToken = `{{${field}_NOTICE}}`;
+    xml = `${xml.slice(0, second)}${noticeToken}${xml.slice(second + token.length)}`;
+  }
+  zip.file('word/document.xml', xml);
+}
+
+function addBuyerSummaryDividers(zip) {
+  const xml = zip.file('word/document.xml').asText();
+  const labels = ['ESTADO CIVIL', 'DIRECCIÓN', 'TELEFONO', 'CORREO ELECTRONICO'];
+  const updated = xml.replace(/<w:tr(?:\s[^>]*)?>[\s\S]*?<\/w:tr>/g, (row) => {
+    if (!labels.some((label) => row.includes(label))) return row;
+    const cells = [...row.matchAll(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g)];
+    if (cells.length < 2) return row;
+    const rightCell = cells[1][0];
+    const separatedCell = rightCell.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (paragraph) => {
+      const breakMatch = paragraph.match(/<w:r(?:\s[^>]*)?>\s*<w:br(?:\s[^>]*)?\s*\/>\s*<\/w:r>/);
+      if (!breakMatch) return paragraph;
+      const paragraphStart = paragraph.match(/^<w:p(?:\s[^>]*)?>/)?.[0];
+      const properties = paragraph.match(/<w:pPr(?:\s[^>]*)?>[\s\S]*?<\/w:pPr>/)?.[0];
+      if (!paragraphStart || !properties) return paragraph;
+
+      const divider = '<w:pBdr><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:pBdr>';
+      let borderedProperties = properties.replace(/<w:pBdr(?:\s[^>]*)?>[\s\S]*?<\/w:pBdr>/g, '');
+      borderedProperties = borderedProperties.replace(/(<w:spacing\b[^>]*\/>)/, '$1<w:ind w:right="0"/>');
+      borderedProperties = borderedProperties.replace(/(<w:pPr(?:\s[^>]*)?>)/, `$1${divider}`);
+      const secondParagraphStart = paragraphStart.replace(/\s+w14:(?:paraId|textId)="[^"]*"/g, '');
+      const firstLine = `${paragraph.slice(0, breakMatch.index)}</w:p>`;
+      const secondLine = `${secondParagraphStart}${borderedProperties}${paragraph.slice(breakMatch.index + breakMatch[0].length)}`;
+      return `${firstLine}${secondLine}`;
+    });
+    return `${row.slice(0, cells[1].index)}${separatedCell}${row.slice(cells[1].index + rightCell.length)}`;
+  });
+  zip.file('word/document.xml', updated);
+}
+
 function removeRunContaining(xml, marker) {
   const markerIndex = xml.indexOf(marker);
   if (markerIndex < 0) return xml;
@@ -268,6 +310,7 @@ export async function generateContractDocx(form, attachments = {}) {
   if (!response.ok) throw new Error('No se pudo cargar la plantilla de contratos.');
   const zip = new PizZip(await response.arrayBuffer());
   removeDuplicateAttachmentAndArrow(zip);
+  separateBuyerContactPlaceholders(zip);
   positionAnnexCaptions(zip);
   boldPlaceholderWithoutHighlight(zip, 'SEMIANNUAL_MONTHS');
   replaceArrasPriceWithDynamicValues(zip);
@@ -275,20 +318,28 @@ export async function generateContractDocx(form, attachments = {}) {
   const signingDate = new Date(`${form.signingDate || new Date().toISOString().slice(0, 10)}T12:00:00Z`);
   const dateLabel = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(signingDate);
   const coBuyerName = (form.coBuyerName || '').trim();
+  const extraordinaryPayment = Number(form.extraordinaryPayment) || 0;
+  const hasExtraordinaryPayment = extraordinaryPayment !== 0;
+  const buyerValue = (primary, secondary) => `${primary || ''}${coBuyerName ? `\n${secondary || ''}` : ''}`;
   document.render({
     BUYER_NAME: form.buyerName,
     BUYER_ID_TYPE: form.buyerIdType,
     BUYER_ID: form.buyerIdentification,
     BUYER_ID_PLACE: form.buyerIssuedIn,
-    MARITAL_STATUS: form.buyerMaritalStatus,
-    BUYER_ADDRESS: form.buyerAddress,
-    BUYER_PHONE: form.buyerPhone,
-    BUYER_EMAIL: form.buyerEmail,
+    MARITAL_STATUS: buyerValue(form.buyerMaritalStatus, form.coBuyerMaritalStatus),
+    BUYER_ADDRESS: buyerValue(form.buyerAddress, form.coBuyerAddress),
+    BUYER_ADDRESS_NOTICE: form.buyerAddress || '',
+    BUYER_PHONE: buyerValue(form.buyerPhone, form.coBuyerPhone),
+    BUYER_PHONE_NOTICE: form.buyerPhone || '',
+    BUYER_EMAIL: buyerValue(form.buyerEmail, form.coBuyerEmail),
+    BUYER_EMAIL_NOTICE: form.buyerEmail || '',
     CO_BUYER_NAME: coBuyerName || 'N/A',
     CO_BUYER_ID_TYPE: coBuyerName ? form.coBuyerIdType || 'C.C.' : '',
-    CO_BUYER_ID: form.coBuyerIdentification || 'N/A',
-    CO_BUYER_NOTICE: coBuyerName ? `\n\nSEGUNDO PROMITENTE COMPRADOR: ${coBuyerName}, identificado con ${form.coBuyerIdType || 'C.C.'} ${form.coBuyerIdentification || ''}, expedida en ${form.coBuyerIssuedIn || ''}` : '',
-    CO_BUYER_SIGNATURE: coBuyerName ? `\n\n______________________\n${coBuyerName}\n${form.coBuyerIdType || 'C.C.'} ${form.coBuyerIdentification || ''}, expedida en ${form.coBuyerIssuedIn || ''}` : '',
+    CO_BUYER_ID: coBuyerName ? `${form.coBuyerIdentification || ''} expedida en ${form.coBuyerIssuedIn || ''}` : 'N/A',
+    CO_BUYER_NOTICE: coBuyerName
+      ? `\n\nSEGUNDO PROMITENTE COMPRADOR: ${coBuyerName}\nDirección: ${form.coBuyerAddress || ''}\nCorreo: ${form.coBuyerEmail || ''}\nTeléfono: ${form.coBuyerPhone || ''}`
+      : '',
+    CO_BUYER_SIGNATURE: coBuyerName ? `\n\n______________________\n${coBuyerName}\n${form.coBuyerIdType || 'C.C.'} ${form.coBuyerIdentification || ''} de ${form.coBuyerIssuedIn || ''}` : '',
     LOT: form.lot,
     AREA: form.areaM2,
     PRICE_WORDS: (form.priceInWords || '').toUpperCase(),
@@ -303,14 +354,15 @@ export async function generateContractDocx(form, attachments = {}) {
     SEMIANNUAL_COUNT: String(form.semiannualInstallmentCount),
     SEMIANNUAL_MONTHS: form.semiannualMonths,
     SEMIANNUAL_PAYMENT: `$${currency(form.semiannualInstallment)}`,
-    EXTRAORDINARY_COUNT: form.extraordinaryPayment ? '1' : 'N/A',
-    EXTRAORDINARY_PAYMENT: form.extraordinaryPayment ? `$${currency(form.extraordinaryPayment)}` : '-',
+    EXTRAORDINARY_COUNT: hasExtraordinaryPayment ? '1' : 'N/A',
+    EXTRAORDINARY_PAYMENT: hasExtraordinaryPayment ? `$${currency(extraordinaryPayment)}` : 'N/A',
     FINAL_PAYMENT: `$${currency(form.finalPayment)}`,
     SIGNING_DATE: dateLabel,
     SIGNING_CITY: form.signingCity,
   });
 
   const generated = document.getZip();
+  addBuyerSummaryDividers(generated);
   const scheduleJpeg = attachments.paymentPlanFile?.type.startsWith('image/')
     ? await imageFileToJpeg(attachments.paymentPlanFile)
     : await svgToJpeg(paymentScheduleSvg(form));
