@@ -4,7 +4,9 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
+import Home from './components/Home';
 import ToolsPage from './components/tools/ToolsPage';
+import Print3DCalculator from './components/tools/Print3DCalculator';
 import Login from './components/auth/Login';
 import ForgotPassword from './components/auth/ForgotPassword';
 import ResetPassword from './components/auth/ResetPassword';
@@ -76,9 +78,9 @@ function AppLayout() {
   return (
     <div className="flex-1 flex flex-col bg-[#f7f8fc] dark:bg-[#07070f] transition-colors duration-300 bg-grid-light dark:bg-grid">
       <Header />
-      <main className="flex-1 w-full max-w-screen-xl mx-auto px-4 py-8">
+      <main className={location.pathname === "/" ? "flex-1 w-full" : "flex-1 w-full max-w-screen-xl mx-auto px-4 py-8"}>
         <Routes>
-          <Route path="/" element={<ToolsPage />} />
+          <Route path="/" element={<Home />} />
           {/* Tienda temporalmente oculta
           <Route path="/tienda" element={<Store />} />
           <Route path="/checkout" element={<Checkout />} />
@@ -89,6 +91,7 @@ function AppLayout() {
           <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/change-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/tools" element={<ToolsPage />} />
+          <Route path="/tools/3d-print-calculator" element={<Print3DCalculator />} />
           <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
           <Route path="/profile-debug" element={<ProtectedRoute><UserProfileDebug /></ProtectedRoute>} />

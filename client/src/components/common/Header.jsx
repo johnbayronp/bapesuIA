@@ -106,6 +106,10 @@ const Header = () => {
         <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block absolute md:relative top-16 md:top-0 left-0 w-full md:w-auto bg-white/95 dark:bg-[#0d0d1a]/95 backdrop-blur-xl md:backdrop-blur-none md:bg-transparent shadow-xl md:shadow-none border-b border-gray-100 dark:border-white/5 md:border-0`}>
           <div className="px-4 py-3 md:py-0 space-y-1 md:space-y-0 md:flex md:items-center md:space-x-1">
 
+            <Link to="/" className={navLinkClass('/')} onClick={() => setIsMenuOpen(false)}>
+              Inicio
+            </Link>
+
             <Link to="/tools" className={navLinkClass('/tools')} onClick={() => setIsMenuOpen(false)}>
               Herramientas IA
             </Link>
