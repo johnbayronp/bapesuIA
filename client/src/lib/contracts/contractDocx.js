@@ -3,6 +3,7 @@ import PizZip from 'pizzip';
 import contractTemplateUrl from '../../assets/contract-template.docx?url';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const attachmentPagesCache = new WeakMap();
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const monthIndex = Object.fromEntries(MONTHS.map((month, index) => [month.toLowerCase(), index]));
 const number = (value) => Number(value || 0);
@@ -273,7 +274,6 @@ async function attachmentPlaceholder(label) {
 }
 
 async function imageFileToPng(file) {
-  if (!file?.type.startsWith('image/')) throw new Error('Para insertar el plano y la cédula en el Word, selecciona archivos JPG o PNG.');
   const image = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
   canvas.width = image.width;
@@ -285,6 +285,125 @@ async function imageFileToPng(file) {
   context.drawImage(image, 0, 0);
   image.close?.();
   return new Uint8Array(await (await canvasBlob(canvas, 'image/png')).arrayBuffer());
+}
+
+async function attachmentKind(file) {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+  if (type === 'image/jpeg' || type === 'image/png' || /\.(jpe?g|png)$/.test(name)) return 'image';
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  if (String.fromCharCode(...bytes.slice(0, 5)) === '%PDF-') return 'pdf';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image';
+  return null;
+}
+
+async function pdfFileToPngPages(file) {
+  const [pdfjs, worker] = await Promise.all([
+    import('pdfjs-dist/build/pdf.mjs'),
+    import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+  ]);
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+  const pdf = await loadingTask.promise;
+  const pages = [];
+  try {
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(1.6, 1400 / baseViewport.width, 1800 / baseViewport.height);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('El navegador no pudo preparar las páginas del PDF.');
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvas, canvasContext: context, viewport }).promise;
+      pages.push({ data: new Uint8Array(await (await canvasBlob(canvas, 'image/png')).arrayBuffer()), width: canvas.width, height: canvas.height });
+      canvas.width = 0;
+      canvas.height = 0;
+      page.cleanup();
+    }
+  } finally {
+    await loadingTask.destroy();
+  }
+  return pages;
+}
+
+function attachmentParagraphForRelationship(xml, relationshipId) {
+  return [...xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)]
+    .find((match) => match[0].includes(`r:embed="${relationshipId}"`));
+}
+
+function resizePdfImageParagraph(paragraph, page) {
+  const maxWidth = 4743450;
+  const maxHeight = 6034776;
+  const scale = Math.min(maxWidth / page.width, maxHeight / page.height);
+  const width = Math.round(page.width * scale);
+  const height = Math.round(page.height * scale);
+  return paragraph
+    .replace(/<wp:extent cx="\d+" cy="\d+"\/>/, `<wp:extent cx="${width}" cy="${height}"/>`)
+    .replace(/<a:ext cx="\d+" cy="\d+"\/>/, `<a:ext cx="${width}" cy="${height}"/>`);
+}
+
+function appendAdditionalPdfPages(zip, relationshipId, pages) {
+  if (pages.length < 2) return;
+  let documentXml = zip.file('word/document.xml').asText();
+  const imageParagraph = attachmentParagraphForRelationship(documentXml, relationshipId);
+  if (!imageParagraph) throw new Error('No se encontró el espacio del anexo PDF en el contrato.');
+  const relationshipsPath = 'word/_rels/document.xml.rels';
+  let relationshipsXml = zip.file(relationshipsPath).asText();
+  const relationshipTags = [...relationshipsXml.matchAll(/<Relationship\b[^>]*\/>/g)].map((match) => match[0]);
+  const imageRelationship = relationshipTags.find((tag) => tag.includes(`Id="${relationshipId}"`));
+  const target = imageRelationship?.match(/\bTarget="([^"]+)"/)?.[1];
+  if (!target) throw new Error('No se pudo preparar el PDF para el documento Word.');
+  let nextRelationshipId = Math.max(0, ...relationshipTags.map((tag) => Number(tag.match(/\bId="rId(\d+)"/)?.[1] || 0))) + 1;
+  let nextDrawingId = Math.max(0, ...[...documentXml.matchAll(/<wp:docPr\b[^>]*\bid="(\d+)"/g)].map((match) => Number(match[1]))) + 1;
+  const clones = [];
+
+  for (let index = 1; index < pages.length; index += 1) {
+    const newRelationshipId = `rId${nextRelationshipId++}`;
+    const newTarget = target.replace(/\.png$/i, `-page-${index + 1}.png`);
+    const relationshipType = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+    relationshipsXml = relationshipsXml.replace('</Relationships>', `<Relationship Id="${newRelationshipId}" Type="${relationshipType}" Target="${newTarget}"/></Relationships>`);
+    zip.file(`word/${newTarget}`, pages[index].data);
+
+    let paragraph = resizePdfImageParagraph(imageParagraph[0], pages[index])
+      .replace(`r:embed="${relationshipId}"`, `r:embed="${newRelationshipId}"`)
+      .replace(/\s+w14:(?:paraId|textId)="[^"]*"/g, '')
+      .replace(/\s+wp14:(?:anchorId|editId)="[^"]*"/g, '')
+      .replace(/(<wp:docPr\b[^>]*\bid=")\d+("[^>]*\bname=")[^"]*(")/, `$1${nextDrawingId}$2Anexo PDF página ${index + 1}$3`)
+      .replace(/(<pic:cNvPr\b[^>]*\bid=")\d+(")/, `$1${nextDrawingId}$2`);
+    if (/<w:pPr(?:\s[^>]*)?>/.test(paragraph)) paragraph = paragraph.replace(/(<w:pPr(?:\s[^>]*)?>)/, '$1<w:pageBreakBefore/>');
+    else paragraph = paragraph.replace(/(<w:p(?:\s[^>]*)?>)/, '$1<w:pPr><w:pageBreakBefore/></w:pPr>');
+    clones.push(paragraph);
+    nextDrawingId += 1;
+  }
+
+  documentXml = `${documentXml.slice(0, imageParagraph.index + imageParagraph[0].length)}${clones.join('')}${documentXml.slice(imageParagraph.index + imageParagraph[0].length)}`;
+  zip.file('word/document.xml', documentXml);
+  zip.file(relationshipsPath, relationshipsXml);
+}
+
+async function attachmentToPngPages(file, label) {
+  if (!file) return { pages: [{ data: await attachmentPlaceholder(label) }], kind: null };
+  if (attachmentPagesCache.has(file)) return attachmentPagesCache.get(file);
+  const pagesPromise = (async () => {
+    const kind = await attachmentKind(file);
+    if (kind === 'pdf') return { pages: await pdfFileToPngPages(file), kind };
+    if (kind === 'image') return { pages: [{ data: await imageFileToPng(file) }], kind };
+    throw new Error('Adjunta un PDF o una imagen JPG o PNG.');
+  })();
+  attachmentPagesCache.set(file, pagesPromise);
+  try {
+    return await pagesPromise;
+  } catch (error) {
+    attachmentPagesCache.delete(file);
+    throw error;
+  }
 }
 
 async function imageFileToJpeg(file) {
@@ -302,10 +421,12 @@ async function imageFileToJpeg(file) {
 }
 
 export async function generateContractDocx(form, attachments = {}) {
-  const [mapPng, idPng] = await Promise.all([
-    attachments.mapFile?.type.startsWith('image/') ? imageFileToPng(attachments.mapFile) : attachmentPlaceholder('PLANO DEL LOTE'),
-    attachments.idFile?.type.startsWith('image/') ? imageFileToPng(attachments.idFile) : attachmentPlaceholder('DOCUMENTO DEL COMPRADOR'),
+  const [mapAttachment, idAttachment] = await Promise.all([
+    attachmentToPngPages(attachments.mapFile, 'PLANO DEL LOTE'),
+    attachmentToPngPages(attachments.idFile, 'DOCUMENTO DEL COMPRADOR'),
   ]);
+  const { pages: mapPages, kind: mapKind } = mapAttachment;
+  const { pages: idPages, kind: idKind } = idAttachment;
   const response = await fetch(contractTemplateUrl);
   if (!response.ok) throw new Error('No se pudo cargar la plantilla de contratos.');
   const zip = new PizZip(await response.arrayBuffer());
@@ -363,11 +484,13 @@ export async function generateContractDocx(form, attachments = {}) {
 
   const generated = document.getZip();
   addBuyerSummaryDividers(generated);
+  generated.file('word/media/image3.png', mapPages[0].data);
+  generated.file('word/media/image4.png', idPages[0].data);
+  if (mapKind === 'pdf') appendAdditionalPdfPages(generated, 'rId12', mapPages);
+  if (idKind === 'pdf') appendAdditionalPdfPages(generated, 'rId13', idPages);
   const scheduleJpeg = attachments.paymentPlanFile?.type.startsWith('image/')
     ? await imageFileToJpeg(attachments.paymentPlanFile)
     : await svgToJpeg(paymentScheduleSvg(form));
   generated.file('word/media/image1.jpeg', scheduleJpeg);
-  generated.file('word/media/image3.png', mapPng);
-  generated.file('word/media/image4.png', idPng);
   return new Blob([generated.generate({ type: 'uint8array', compression: 'DEFLATE' })], { type: DOCX_MIME });
 }

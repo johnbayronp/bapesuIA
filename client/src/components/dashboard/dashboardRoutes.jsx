@@ -11,6 +11,7 @@ import CobrosModule from './sections/CobrosModule';
 import FacturaEditor from './sections/FacturaEditor';
 import QuotationsList from './sections/QuotationsList';
 import ContractsModule from './sections/ContractsModule';
+import TraceabilityModule from './sections/TraceabilityModule';
 import QuotationEditor from './sections/QuotationEditor';
 import InvoiceEditor from './sections/InvoiceEditor';
 import LockedModule from './LockedModule';
@@ -38,6 +39,7 @@ const ROUTES = [
   { routePath: '/cobros', test: (p) => p === '/cobros' },
   { routePath: '/quotations', test: (p) => p === '/quotations' },
   { routePath: '/contracts', test: (p) => p === '/contracts' },
+  { routePath: '/traceability', test: (p) => p === '/traceability' },
   { routePath: '/users', test: (p) => p === '/users' },
   { routePath: '/company', test: (p) => p === '/company' },
 ];
@@ -72,6 +74,8 @@ export function renderDashboardPage(pathname, { canAccess, company }) {
       return canAccess('cotizaciones') ? <QuotationsList /> : locked('Cotizaciones');
     case '/contracts':
       return canAccess('contratos') ? <ContractsModule /> : locked('Contratos');
+    case '/traceability':
+      return <TraceabilityModule />;
     case '/users':
       return <UsersManager />;
     case '/company':
