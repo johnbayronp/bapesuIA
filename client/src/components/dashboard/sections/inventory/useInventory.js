@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../../api';
 import { useCompany } from '../../../../context/CompanyContext';
+import { isStoreCompany } from '../../../../lib/storeConfig';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { EMPTY_ARRAY, invalidateCompanyData, unwrapSupabaseResponse } from '../../../../lib/queryUtils';
 import { uploadToS3 } from '../../../../lib/s3Upload';
@@ -126,6 +127,7 @@ export function useInventory() {
       unit:             p.unit ?? 'unidad',
       photo_url:        p.photo_url ?? '',
       is_active:        p.is_active ?? true,
+      show_in_store:    p.show_in_store ?? false,
       stock_available:  p.stock_available ?? 0,
       stock_reserved:   p.stock_reserved ?? 0,
       stock_in_transit: p.stock_in_transit ?? 0,
@@ -188,6 +190,7 @@ export function useInventory() {
         unit:             productForm.unit || 'unidad',
         photo_url:        photoUrl,
         is_active:        productForm.is_active,
+        ...(isStoreCompany(company.id) ? { show_in_store: Boolean(productForm.show_in_store) } : {}),
         stock_available:  Number(productForm.stock_available) || 0,
         stock_reserved:   Number(productForm.stock_reserved)  || 0,
         stock_in_transit: Number(productForm.stock_in_transit) || 0,

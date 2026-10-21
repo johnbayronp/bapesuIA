@@ -1,4 +1,5 @@
 import React from 'react';
+import useSeo from '../../hooks/useSeo';
 import { Link } from 'react-router-dom';
 import InfoBanner from '../common/InfoBanner';
 import AdBanner from '../adsence/AdBanner';
@@ -186,6 +187,7 @@ const tools = [
 ];
 
 export default function ToolsPage() {
+  useSeo({ title: 'Herramientas de IA gratis | Bapesu IA', description: 'Herramientas gratuitas de inteligencia artificial para emprendedores: quitar fondos, códigos QR, enlaces de WhatsApp, facturas, cotizaciones, nómina y calculadora de impresión 3D.', path: '/tools' });
   // Los "Más usados" siempre primero, manteniendo el orden original entre ellos
   const sortedTools = [...tools].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
 

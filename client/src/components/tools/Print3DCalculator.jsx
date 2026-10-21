@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import useSeo from '../../hooks/useSeo';
 import { Link } from 'react-router-dom';
 
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
@@ -33,6 +34,7 @@ const allFields = groups.flatMap((group) => group.fields);
 const inputClass = 'mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white';
 
 export default function Print3DCalculator() {
+  useSeo({ title: 'Calculadora de costos de impresión 3D gratis (COP) | Bapesu', description: 'Calcula cuánto cobrar por una impresión 3D: filamento, energía, tiempo de máquina, mano de obra y margen. Resultados en pesos colombianos al instante.', path: '/tools/3d-print-calculator' });
   const [values, setValues] = useState(initial);
   const [volumeEnabled, setVolumeEnabled] = useState(false);
   const [project, setProject] = useState('');

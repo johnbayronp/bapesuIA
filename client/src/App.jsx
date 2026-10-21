@@ -28,7 +28,7 @@ import AdScriptLoader from './components/adsence/AdScriptLoader';
 import UserProfile from './components/auth/UserProfile';
 import UserProfileDebug from './components/auth/UserProfileDebug';
 import UserOrders from './components/auth/UserOrders';
-import Store from './components/Store';
+import StorePage from './components/store/StorePage';
 import Checkout from './components/Checkout';
 import CheckoutSuccess from './components/CheckoutSuccess';
 import { EcommerceProvider } from './context/EcommerceContext';
@@ -81,8 +81,8 @@ function AppLayout() {
       <main className={location.pathname === "/" ? "flex-1 w-full" : "flex-1 w-full max-w-screen-xl mx-auto px-4 py-8"}>
         <Routes>
           <Route path="/" element={<Home />} />
-          {/* Tienda temporalmente oculta
-          <Route path="/tienda" element={<Store />} />
+          <Route path="/tienda" element={<StorePage />} />
+          {/* Checkout antiguo (usaba el backend). La tienda ahora cierra pedidos por WhatsApp.
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/checkout-success" element={<CheckoutSuccess />} />
           */}
