@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import roboticsTriptych from '../assets/bapesu-student-robotics.png';
 import HomeLab from './HomeLab';
+import { ServicesOverview, TaglineReveal, SuppliesSection, PrintersSection, RepairSection, RndSection, TutorialsSection, FaqSection, FinalCta, waLink, QUOTE_MESSAGE } from './home/LandingSections';
 import './home.css';
 
 const heroSlides = [
+  { id: 'printer', label: 'Impresión 3D', title: 'Imprime, abastece', highlight: 'y repara en 3D.', description: 'Imprimimos tus piezas, vendemos filamentos, resinas y repuestos, y dejamos tu impresora 3D funcionando como el primer día.', target: 'servicios', accent: '#c2a1ff' },
   { id: 'robot', label: 'Robótica', title: 'Dale movimiento', highlight: 'a tus ideas.', description: 'Robots que exploran, aprenden y transforman. Combinamos ingeniería y creatividad para construir lo que imaginas.', target: 'robotica', accent: '#64f7df' },
-  { id: 'printer', label: 'Impresión 3D', title: 'Imagina algo.', highlight: 'Hazlo real.', description: 'Del primer boceto a una pieza en tus manos. Descubre nuevas formas de crear, prototipar y fabricar en tres dimensiones.', target: 'impresion-3d', accent: '#c2a1ff' },
   { id: 'circuit', label: 'Electrónica', title: 'Conecta ideas.', highlight: 'Enciende el futuro.', description: 'Sensores, circuitos y pequeñas conexiones con grandes posibilidades. Damos vida a dispositivos que interactúan con el mundo.', target: 'electronica', accent: '#70d9ff' },
 ];
 const studentSlides = [
@@ -29,17 +30,8 @@ const studentSlides = [
 
 const sections = [
   {
-    id: 'impresion-3d',
-    number: '01',
-    title: 'Impresión 3D',
-    description: 'Convertimos ideas y diseños en piezas físicas para prototipos, proyectos y soluciones a la medida.',
-    capabilities: ['Prototipado', 'Piezas personalizadas', 'Modelos y soportes'],
-    icon: <><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9L12 3Z"/><path d="M3.8 7.7 12 12l8.2-4.3M12 12v8.5M7.7 5.2l8.6 4.5v4.5"/></>,
-    color: 'violet',
-  },
-  {
     id: 'electronica',
-    number: '02',
+    number: '01',
     title: 'Electrónica',
     description: 'Diseñamos y conectamos componentes electrónicos para dar vida a dispositivos y productos funcionales.',
     capabilities: ['Circuitos y módulos', 'Sensores', 'Integración de componentes'],
@@ -48,7 +40,7 @@ const sections = [
   },
   {
     id: 'robotica',
-    number: '03',
+    number: '02',
     title: 'Robótica',
     description: 'Creamos prototipos y sistemas que combinan mecánica, electrónica y programación para resolver retos reales.',
     capabilities: ['Robots y prototipos', 'Automatización', 'Proyectos educativos'],
@@ -57,7 +49,7 @@ const sections = [
   },
   {
     id: 'desarrollo-software',
-    number: '04',
+    number: '03',
     title: 'Desarrollo de software',
     description: 'Construimos herramientas digitales para organizar procesos, conectar servicios y hacer crecer proyectos.',
     capabilities: ['Aplicaciones web', 'Automatización de procesos', 'Integraciones y sistemas a la medida'],
@@ -128,12 +120,10 @@ export default function Home() {
           <h1 aria-label={hero.title + ' ' + hero.highlight}>{[hero.title, hero.highlight].map((line, lineIndex) => <span className={'home-title-line ' + (lineIndex ? 'home-title-accent' : '')} key={line} aria-hidden="true">{line.split(' ').map((word, index) => <motion.b key={index} variants={{ hidden: { y: reducedMotion ? 0 : 50, opacity: 0, rotateX: reducedMotion ? 0 : 35 }, visible: { y: 0, opacity: 1, rotateX: 0, transition: { type: 'spring', stiffness: 110, damping: 18 } } }}>{word}{' '}</motion.b>)}</span>)}</h1>
           <p className="home-hero-description">{hero.description}</p>
           <div className="home-hero-actions">
-            <a href={'#' + hero.target}>Explorar {hero.label.toLowerCase()} <span aria-hidden="true">↗</span></a>
-            <a href="#bapesu-student-title">Bapesu Student <span aria-hidden="true">→</span></a>
+            <a href={waLink(QUOTE_MESSAGE)} target="_blank" rel="noopener noreferrer">Cotizar por WhatsApp <span aria-hidden="true">↗</span></a>
+            <a href={'#' + hero.target}>{hero.id === 'printer' ? 'Ver servicios' : 'Explorar ' + hero.label.toLowerCase()} <span aria-hidden="true">↓</span></a>
           </div>
-          <div className="home-hero-links">
-            {sections.map((section) => <a key={section.id} href={'#' + section.id}>{section.title}</a>)}
-          </div>
+          <p className="home-hero-links">Impresión bajo pedido · Impresoras e insumos · Reparación · I+D para empresas</p>
         </motion.div>
         </AnimatePresence>
         <HomeLab mode={hero.id} isPaused={heroPaused} reducedMotion={reducedMotion} />
@@ -150,16 +140,24 @@ export default function Home() {
         </div>
       </section>
       <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6">
-      <section aria-labelledby="areas-title" className="mt-14 sm:mt-20">
-        <div className="mb-7 flex flex-col gap-2 sm:mb-9 sm:flex-row sm:items-end sm:justify-between">
+      <ServicesOverview />
+      <TaglineReveal />
+      <SuppliesSection />
+      <PrintersSection />
+      <RepairSection />
+      <RndSection />
+      <TutorialsSection />
+
+      <section aria-labelledby="areas-title" className="mt-16 sm:mt-24">
+        <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">Lo que hacemos</p>
-            <h2 id="areas-title" className="mt-2 text-2xl font-extrabold tracking-tight text-gray-950 dark:text-white sm:text-3xl">Tecnología de principio a fin</h2>
+            <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-300">También hacemos</p>
+            <h2 id="areas-title" className="mt-2 text-3xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-4xl">Tecnología más allá de la impresión 3D</h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-gray-500 dark:text-gray-400">Unimos distintas disciplinas para acompañar cada etapa, desde la primera idea hasta una solución lista para usar.</p>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {sections.map((section) => {
             const colors = colorStyles[section.color];
             return (
@@ -259,11 +257,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mt-14 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-6 py-8 dark:border-white/10 dark:from-indigo-500/10 dark:via-[#0d0d1a] dark:to-cyan-500/10 sm:mt-20 sm:px-10 sm:py-10">
-        <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-300">Bapesu · ideas que toman forma</p>
-        <h2 className="mt-2 text-2xl font-extrabold text-gray-950 dark:text-white">Un mismo espacio para crear, conectar y construir.</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">También puedes explorar las herramientas digitales gratuitas y los recursos de Bapesu Studio desde el menú superior.</p>
-      </section>
+      <FaqSection />
+      <FinalCta />
       </div>
     </div>
   );
