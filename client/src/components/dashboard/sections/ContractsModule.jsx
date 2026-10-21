@@ -546,6 +546,10 @@ export default function ContractsModule() {
       <style>{`
         .contract-docx-paper .docx-wrapper { background: #e2e8f0; padding: .75rem 0; }
         .contract-docx-paper .docx { margin: 0 auto 1rem; box-shadow: 0 1px 5px #0002; }
+        .contract-docx-paper .docx, .contract-docx-paper .docx * {
+          -webkit-hyphens: none !important;
+          hyphens: none !important;
+        }
         @media print {
           body * { visibility: hidden !important; }
           .contract-print-root, .contract-print-root * { visibility: visible !important; }
