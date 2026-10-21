@@ -10,6 +10,7 @@ export const EMPTY_PRODUCT = {
   unit:            'unidad',
   photo_url:       '',
   is_active:       true,
+  show_in_store:   false,
   stock_available:  0,
   stock_reserved:   0,
   stock_in_transit: 0,

@@ -110,6 +110,10 @@ const Header = () => {
               Inicio
             </Link>
 
+            <Link to="/tienda" className={navLinkClass('/tienda')} onClick={() => setIsMenuOpen(false)}>
+              Tienda
+            </Link>
+
             <Link to="/tools" className={navLinkClass('/tools')} onClick={() => setIsMenuOpen(false)}>
               Herramientas IA
             </Link>

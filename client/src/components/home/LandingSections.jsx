@@ -182,9 +182,12 @@ export function SuppliesSection() {
             text="Material y repuestos para las impresoras más comunes. Escríbenos qué necesitas y te confirmamos disponibilidad y precio."
           />
         </Reveal>
-        <Reveal delay={0.1}>
-          <a href={waLink('Hola Bapesu, quiero consultar disponibilidad de insumos 3D.')} target="_blank" rel="noopener noreferrer" className={PRIMARY_BTN}>
-            <WhatsappLogo size={20} weight="fill" aria-hidden="true" />Consultar insumos
+        <Reveal delay={0.1} className="flex flex-wrap gap-3">
+          <Link to="/tienda" className={PRIMARY_BTN}>
+            <Package size={20} aria-hidden="true" />Comprar en la tienda
+          </Link>
+          <a href={waLink('Hola Bapesu, quiero consultar disponibilidad de insumos 3D.')} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>
+            <WhatsappLogo size={20} aria-hidden="true" />Consultar por WhatsApp
           </a>
         </Reveal>
       </div>
@@ -510,11 +513,11 @@ export function TutorialsSection() {
 
 /* ── 5. Preguntas frecuentes ──────────────────────────────── */
 
-const faqs = [
+export const faqs = [
   { q: '¿Qué necesito para cotizar una impresión?', a: 'El archivo STL u OBJ, o una foto con medidas si aún no tienes el modelo. Con eso te indicamos material, tiempo y precio.' },
   { q: '¿Puedo calcular el precio yo mismo?', a: 'Sí. Nuestra calculadora de impresión 3D gratuita estima el costo según material, tiempo de impresión y energía.' },
   { q: '¿Qué materiales imprimen?', a: 'Trabajamos con PLA, PETG y TPU en impresión por filamento, y con resina cuando la pieza necesita alto detalle.' },
-  { q: '¿Venden filamento por unidad?', a: 'Sí. Puedes pedir una sola bobina o varias. Escríbenos el material, color y diámetro que necesitas.' },
+  { q: '¿Venden filamento por unidad?', a: 'Sí. Puedes comprar una sola bobina o varias en nuestra tienda en línea, o escribirnos el material, color y diámetro que necesitas.' },
   { q: '¿Venden impresoras 3D?', a: 'Sí. Te asesoramos según lo que quieres imprimir y tu presupuesto, y te entregamos el equipo instalado y calibrado.' },
   { q: '¿Desarrollan proyectos para empresas?', a: 'Sí. Nuestro equipo de I+D crea soluciones para los sectores agrícola y petrolero, y diseños a la medida. Escríbenos con tu reto y agendamos una reunión.' },
   { q: '¿Qué impresoras reparan?', a: 'Impresoras FDM y de resina de las marcas más comunes. Si tienes un modelo poco común, envíanos la referencia y te confirmamos.' },

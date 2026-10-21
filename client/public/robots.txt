@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /superadmin
+Disallow: /profile
+Disallow: /orders
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /change-password
+
+Sitemap: https://bapesuia.com/sitemap.xml

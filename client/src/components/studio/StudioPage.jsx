@@ -1,4 +1,5 @@
 import React from 'react';
+import useSeo from '../../hooks/useSeo';
 import { Link } from 'react-router-dom';
 import AdBanner from '../adsence/AdBanner';
 
@@ -84,6 +85,7 @@ const stats = [
 ];
 
 export default function StudioPage() {
+  useSeo({ title: 'Bapesu Studio | Guiones, títulos y descripciones para YouTube con IA', description: 'Crea guiones, ganchos, títulos virales y descripciones para YouTube con inteligencia artificial. Gratis y en español.', path: '/studio' });
   return (
     <div className="space-y-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

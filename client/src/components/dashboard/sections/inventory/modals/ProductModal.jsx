@@ -1,5 +1,7 @@
 import React from 'react';
 import { INPUT, LABEL, UNITS, formatPriceCOP, parsePriceCOP } from '../constants';
+import { useCompany } from '../../../../../context/CompanyContext';
+import { isStoreCompany } from '../../../../../lib/storeConfig';
 
 export default function ProductModal({
   modal,
@@ -16,6 +18,8 @@ export default function ProductModal({
   error,
 }) {
   const [photoPreview, setPhotoPreview] = React.useState('');
+  const { company } = useCompany();
+  const canPublish = isStoreCompany(company?.id);
 
   React.useEffect(() => {
     if (!photoFile) {
@@ -210,6 +214,13 @@ export default function ProductModal({
               <input type="checkbox" checked={form.is_active} onChange={(e) => setF('is_active', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-400" />
               <span className="text-xs text-gray-600">Producto activo (visible en el catálogo)</span>
             </label>
+
+            {canPublish && (
+              <label className="flex items-center gap-2 select-none cursor-pointer">
+                <input type="checkbox" checked={Boolean(form.show_in_store)} onChange={(e) => setF('show_in_store', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-400" />
+                <span className="text-xs text-gray-600">Mostrar en la tienda en línea (bapesuia.com/tienda)</span>
+              </label>
+            )}
 
             {error && (
               <p className="text-xs text-red-500 flex items-center gap-1.5">

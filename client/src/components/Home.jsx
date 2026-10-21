@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import roboticsTriptych from '../assets/bapesu-student-robotics.png';
 import HomeLab from './HomeLab';
-import { ServicesOverview, TaglineReveal, SuppliesSection, PrintersSection, RepairSection, RndSection, TutorialsSection, FaqSection, FinalCta, waLink, QUOTE_MESSAGE } from './home/LandingSections';
+import { ServicesOverview, TaglineReveal, SuppliesSection, PrintersSection, RepairSection, RndSection, TutorialsSection, FaqSection, FinalCta, waLink, QUOTE_MESSAGE, faqs } from './home/LandingSections';
+import useSeo from '../hooks/useSeo';
 import './home.css';
 
 const heroSlides = [
@@ -66,6 +67,16 @@ const colorStyles = {
 };
 
 export default function Home() {
+  useSeo({
+    title: 'Bapesu | Impresión 3D, impresoras, insumos y reparación en Colombia',
+    description: 'Impresión 3D bajo pedido, venta de impresoras 3D, filamentos y repuestos, mantenimiento y reparación de impresoras, e I+D para empresas en Colombia. Cotiza por WhatsApp.',
+    path: '/',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+    },
+  });
   const [heroIndex, setHeroIndex] = useState(0);
   const [heroPaused, setHeroPaused] = useState(false);
   const [heroHover, setHeroHover] = useState(false);
