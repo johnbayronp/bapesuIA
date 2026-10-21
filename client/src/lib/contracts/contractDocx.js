@@ -406,18 +406,56 @@ async function attachmentToPngPages(file, label) {
   }
 }
 
-async function imageFileToJpeg(file) {
-  const image = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('El navegador no pudo leer el cuadro del plan de pagos.');
-  context.fillStyle = '#fff';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, 0, 0);
-  image.close?.();
-  return new Uint8Array(await (await canvasBlob(canvas, 'image/jpeg', 0.96)).arrayBuffer());
+async function insertPaymentSchedule(zip, file, form) {
+  // Embed original PNG/JPEG bytes; resizing the drawing does not resample the image.
+  const data = file ? new Uint8Array(await file.arrayBuffer()) : await svgToJpeg(paymentScheduleSvg(form));
+  const isPng = data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47;
+  const isJpeg = data[0] === 0xff && data[1] === 0xd8;
+  if (!isPng && !isJpeg) throw new Error('El cuadro del plan de pagos debe ser una imagen JPG o PNG.');
+  const contentType = isPng ? 'image/png' : 'image/jpeg';
+  const image = await createImageBitmap(new Blob([data], { type: contentType }));
+  const pixels = { width: image.width, height: image.height };
+  image.close();
+  const path = 'word/document.xml';
+  let xml = zip.file(path).asText();
+  const paragraph = attachmentParagraphForRelationship(xml, 'rId9');
+  if (!paragraph) throw new Error('No se encontró el cuadro del plan de pagos en la plantilla.');
+  const section = xml.match(/<w:sectPr\b[\s\S]*?<\/w:sectPr>/)?.[0] || '';
+  const page = section.match(/<w:pgSz\b[^>]*>/)?.[0] || '';
+  const margins = section.match(/<w:pgMar\b[^>]*>/)?.[0] || '';
+  const attr = (tag, name, fallback) => Number(tag.match(new RegExp('w:' + name + '="(\\d+)"'))?.[1] || fallback);
+  const maxWidth = (attr(page, 'w', 12240) - attr(margins, 'left', 1701) - attr(margins, 'right', 1701)) * 635;
+  // Leave room for the caption and paragraph spacing on a new page if needed.
+  const maxHeight = (attr(page, 'h', 15840) - attr(margins, 'top', 1417) - attr(margins, 'bottom', 1417) - 720) * 635;
+  const scale = Math.min(maxWidth / pixels.width, maxHeight / pixels.height);
+  const width = Math.round(pixels.width * scale), height = Math.round(pixels.height * scale);
+  let updated = paragraph[0].replace(/<w:drawing\b[^>]*>[\s\S]*?<\/w:drawing>/g, (drawing) => {
+    if (!drawing.includes('r:embed="rId9"')) return drawing;
+    return drawing
+      .replace(/<a:srcRect\b[^>]*(?:\/>|>[\s\S]*?<\/a:srcRect>)/g, '')
+      .replace(/<wp:extent\b[^>]*\/>/, '<wp:extent cx="' + width + '" cy="' + height + '"/>')
+      .replace(/<a:ext\b[^>]*\bcx="[^>]*\/>/, '<a:ext cx="' + width + '" cy="' + height + '"/>');
+  });
+  updated = updated.replace(/<w:spacing\b[^>]*\/>/g, '').replace(/<w:jc\b[^>]*\/>/g, '');
+  updated = updated.replace('<w:pPr>', '<w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="120" w:line="240" w:lineRule="auto"/>');
+  xml = xml.slice(0, paragraph.index) + updated + xml.slice(paragraph.index + paragraph[0].length);
+  zip.file(path, xml);
+  const target = isPng ? 'media/payment-schedule.png' : 'media/image1.jpeg';
+  const relPath = 'word/_rels/document.xml.rels';
+  zip.file(relPath, zip.file(relPath).asText().replace(/<Relationship\b[^>]*\bId="rId9"[^>]*\/>/, (tag) => tag.replace(/Target="[^"]*"/, 'Target="' + target + '"')));
+  const types = zip.file('[Content_Types].xml').asText();
+  const partName = '/word/' + target;
+  if (!types.includes('PartName="' + partName + '"')) zip.file('[Content_Types].xml', types.replace('</Types>', '<Override PartName="' + partName + '" ContentType="' + contentType + '"/></Types>'));
+  zip.file('word/' + target, data);
+}
+
+// Formatting only: preserve all contract text and intentional hyphens.
+function disableContractHyphenation(zip) {
+  const settings = zip.file('word/settings.xml');
+  if (settings) {
+    const xml = settings.asText().replace(/<w:autoHyphenation\b[^>]*(?:\/>|>[\s\S]*?<\/w:autoHyphenation>)/g, '');
+    zip.file('word/settings.xml', xml.replace('</w:settings>', '<w:autoHyphenation w:val="0"/></w:settings>'));
+  }
 }
 
 export async function generateContractDocx(form, attachments = {}) {
@@ -483,14 +521,12 @@ export async function generateContractDocx(form, attachments = {}) {
   });
 
   const generated = document.getZip();
+  disableContractHyphenation(generated);
   addBuyerSummaryDividers(generated);
   generated.file('word/media/image3.png', mapPages[0].data);
   generated.file('word/media/image4.png', idPages[0].data);
   if (mapKind === 'pdf') appendAdditionalPdfPages(generated, 'rId12', mapPages);
   if (idKind === 'pdf') appendAdditionalPdfPages(generated, 'rId13', idPages);
-  const scheduleJpeg = attachments.paymentPlanFile?.type.startsWith('image/')
-    ? await imageFileToJpeg(attachments.paymentPlanFile)
-    : await svgToJpeg(paymentScheduleSvg(form));
-  generated.file('word/media/image1.jpeg', scheduleJpeg);
+  await insertPaymentSchedule(generated, attachments.paymentPlanFile, form);
   return new Blob([generated.generate({ type: 'uint8array', compression: 'DEFLATE' })], { type: DOCX_MIME });
 }
