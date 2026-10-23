@@ -19,4 +19,5 @@ export { operationsApi } from './operations';
 export { quotationsApi } from './quotations';
 export { contractsApi } from './contracts';
 export { traceabilityApi } from './traceability';
+export { posSalesApi } from './posSales';
 export { adminApi, superadminApi } from './admin';

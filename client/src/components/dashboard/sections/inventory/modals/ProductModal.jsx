@@ -2,12 +2,14 @@ import React from 'react';
 import { INPUT, LABEL, UNITS, formatPriceCOP, parsePriceCOP } from '../constants';
 import { useCompany } from '../../../../../context/CompanyContext';
 import { isStoreCompany } from '../../../../../lib/storeConfig';
+import { generateEan13, generateSku } from '../codeGenerators';
 
 export default function ProductModal({
   modal,
   form,
   setF,
   categories,
+  products = [],
   warehouses = [],
   suppliers = [],
   photoFile,
@@ -68,11 +70,23 @@ export default function ProductModal({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={LABEL}>SKU</label>
-                    <input className={INPUT} value={form.sku} onChange={(e) => setF('sku', e.target.value)} placeholder="CAM-001" />
+                    <div className="relative">
+                      <input className={INPUT + ' pr-10'} value={form.sku} onChange={(e) => setF('sku', e.target.value)} placeholder="CAM-001" />
+                      <button type="button" onClick={() => setF('sku', generateSku(form.name, products.map((p) => p.sku)))} title="Generar SKU automático" aria-label="Generar SKU automático"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className={LABEL}>Código de barras</label>
-                    <input className={INPUT} value={form.barcode} onChange={(e) => setF('barcode', e.target.value)} placeholder="7701234567890" />
+                    <div className="relative">
+                      <input className={INPUT + ' pr-10'} value={form.barcode} onChange={(e) => setF('barcode', e.target.value)} placeholder="7701234567890" />
+                      <button type="button" onClick={() => setF('barcode', generateEan13(products.map((p) => p.barcode)))} title="Generar código de barras (EAN-13)" aria-label="Generar código de barras"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div>

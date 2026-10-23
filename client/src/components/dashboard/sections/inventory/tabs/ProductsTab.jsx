@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { formatCOP, getStockStatus } from '../constants';
+import BarcodeModal from '../modals/BarcodeModal';
 
 export default function ProductsTab({ products, categories, onEdit, onDelete, onAdjustStock, onToggle, deleting }) {
   const [search, setSearch]       = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [statusFilter, setStatus] = useState('all');
+  const [barcodeProduct, setBarcodeProduct] = useState(null);
 
   const filtered = products.filter((p) => {
     if (statusFilter === 'active'   && !p.is_active) return false;
@@ -105,6 +107,12 @@ export default function ProductsTab({ products, categories, onEdit, onDelete, on
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
                       Stock
                     </button>
+                    <button onClick={() => setBarcodeProduct(p)} disabled={!p.sku?.trim()}
+                      title={p.sku?.trim() ? 'Generar código de barras' : 'Agrega un SKU al producto para generar su código de barras'}
+                      aria-label="Código de barras"
+                      className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 flex items-center justify-center transition disabled:opacity-40 disabled:cursor-not-allowed">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h2v14H3zm3 0h1v14H6zm2 0h2v14H8zm3 0h1v14h-1zm2 0h3v14h-3zm4 0h1v14h-1zm2 0h2v14h-2z"/></svg>
+                    </button>
                     <button onClick={() => onEdit(p)}
                       className="w-8 h-8 rounded-lg bg-yellow-100 text-yellow-600 hover:bg-yellow-200 flex items-center justify-center transition">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -124,6 +132,7 @@ export default function ProductsTab({ products, categories, onEdit, onDelete, on
           })}
         </div>
       )}
+      {barcodeProduct && <BarcodeModal product={{ ...barcodeProduct, sku: barcodeProduct.sku.trim() }} onClose={() => setBarcodeProduct(null)} />}
     </div>
   );
 }

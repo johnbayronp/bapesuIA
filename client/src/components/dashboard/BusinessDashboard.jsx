@@ -66,6 +66,19 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    id: 'print3d',
+    module: 'impresion3d',
+    hiddenWhenLocked: true,
+    label: 'Impresión 3D',
+    href: '/dashboard/impresion-3d',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M4 4h16v4H4zM8 8v3h8V8m-4 3v3m-5 6h10l-1-4H8z" />
+      </svg>
+    ),
+  },
 ];
 
 const BIZ = [
@@ -233,7 +246,7 @@ export default function BusinessDashboard() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <p className="text-[10px] uppercase tracking-widest text-gray-400 px-3 mb-2">General</p>
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.hiddenWhenLocked || canAccess(item.module)).map((item) => {
           const active = isActive(item.href, item.exact);
           const allowed = !item.module || canAccess(item.module);
           return (

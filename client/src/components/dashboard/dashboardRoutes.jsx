@@ -14,6 +14,7 @@ import ContractsModule from './sections/ContractsModule';
 import TraceabilityModule from './sections/TraceabilityModule';
 import QuotationEditor from './sections/QuotationEditor';
 import InvoiceEditor from './sections/InvoiceEditor';
+import Print3DModule from './sections/Print3DModule';
 import LockedModule from './LockedModule';
 
 export function normalizeDashboardPath(pathname) {
@@ -40,6 +41,7 @@ const ROUTES = [
   { routePath: '/quotations', test: (p) => p === '/quotations' },
   { routePath: '/contracts', test: (p) => p === '/contracts' },
   { routePath: '/traceability', test: (p) => p === '/traceability' },
+  { routePath: '/impresion-3d', test: (p) => p === '/impresion-3d' },
   { routePath: '/users', test: (p) => p === '/users' },
   { routePath: '/company', test: (p) => p === '/company' },
 ];
@@ -76,6 +78,9 @@ export function renderDashboardPage(pathname, { canAccess, company }) {
       return canAccess('contratos') ? <ContractsModule /> : locked('Contratos');
     case '/traceability':
       return <TraceabilityModule />;
+    case '/impresion-3d':
+      // Módulo privado: si la empresa no lo tiene activo, ni siquiera se muestra que existe.
+      return canAccess('impresion3d') ? <Print3DModule /> : <DashHome />;
     case '/users':
       return <UsersManager />;
     case '/company':
