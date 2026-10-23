@@ -156,6 +156,7 @@ export default function InventoryModule() {
       <ProductModal
         modal={inv.productModal}
         form={inv.productForm}
+        products={inv.products}
         setF={inv.setPF}
         categories={inv.categories}
         warehouses={ops.warehouses}

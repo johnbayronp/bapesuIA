@@ -24,6 +24,8 @@ const MODULES = [
   { id: 'reminders', label: 'Recordatorios' },
   { id: 'analytics', label: 'Analíticas' },
   { id: 'facturacion', label: 'Facturación' },
+  // No pertenece a ningún plan: solo lo ven las empresas a las que se active aquí.
+  { id: 'impresion3d', label: 'Impresión 3D' },
 ];
 
 function genPassword(len = 12) {
